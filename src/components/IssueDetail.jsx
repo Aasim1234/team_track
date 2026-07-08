@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
+import ActivityFeed from './ActivityFeed'
 
 export default function IssueDetail({ issue, onClose, onUpdate }) {
   const [comments, setComments] = useState([])
   const [newComment, setNewComment] = useState('')
   const [members, setMembers] = useState([])
+  const [activeTab, setActiveTab] = useState('comments')
   const { user } = useAuth()
 
   const fetchComments = async () => {
@@ -48,6 +50,11 @@ export default function IssueDetail({ issue, onClose, onUpdate }) {
 
   const handleStatusChange = async (status) => {
     await supabase.from('issues').update({ status }).eq('id', issue.id)
+    onUpdate()
+  }
+
+  const handleDueDateChange = async (dueDate) => {
+    await supabase.from('issues').update({ due_date: dueDate || null }).eq('id', issue.id)
     onUpdate()
   }
 
@@ -107,37 +114,74 @@ export default function IssueDetail({ issue, onClose, onUpdate }) {
               ))}
             </select>
           </div>
+          <div>
+            <span className="text-gray-500 block">Due Date</span>
+            <input
+              type="date"
+              value={issue.due_date || ''}
+              onChange={(e) => handleDueDateChange(e.target.value)}
+              className="bg-gray-700 rounded px-2 py-1"
+            />
+          </div>
         </div>
 
-        <h3 className="font-semibold mb-2">Comments</h3>
-        <div className="space-y-3 mb-4">
-          {comments.map((c) => (
-            <div key={c.id} className="bg-gray-700 rounded p-3">
-              <div className="text-sm font-semibold text-green-400">
-                {c.profiles?.name || 'Unknown'}
-              </div>
-              <div className="text-sm">{c.body}</div>
-            </div>
-          ))}
-          {comments.length === 0 && (
-            <p className="text-gray-500 text-sm">No comments yet.</p>
-          )}
-        </div>
-
-        <form onSubmit={handleAddComment} className="flex gap-2">
-          <input
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Write a comment..."
-            className="flex-1 px-3 py-2 rounded bg-gray-700 outline-none text-sm"
-          />
+        <div className="flex gap-4 border-b border-gray-700 mb-4">
           <button
-            type="submit"
-            className="bg-green-500 hover:bg-green-600 px-4 py-2 rounded text-sm font-semibold"
+            onClick={() => setActiveTab('comments')}
+            className={`pb-2 text-sm font-semibold ${
+              activeTab === 'comments'
+                ? 'text-green-400 border-b-2 border-green-400'
+                : 'text-gray-400'
+            }`}
           >
-            Post
+            Comments ({comments.length})
           </button>
-        </form>
+          <button
+            onClick={() => setActiveTab('activity')}
+            className={`pb-2 text-sm font-semibold ${
+              activeTab === 'activity'
+                ? 'text-green-400 border-b-2 border-green-400'
+                : 'text-gray-400'
+            }`}
+          >
+            Activity
+          </button>
+        </div>
+
+        {activeTab === 'comments' && (
+          <>
+            <div className="space-y-3 mb-4">
+              {comments.map((c) => (
+                <div key={c.id} className="bg-gray-700 rounded p-3">
+                  <div className="text-sm font-semibold text-green-400">
+                    {c.profiles?.name || 'Unknown'}
+                  </div>
+                  <div className="text-sm">{c.body}</div>
+                </div>
+              ))}
+              {comments.length === 0 && (
+                <p className="text-gray-500 text-sm">No comments yet.</p>
+              )}
+            </div>
+
+            <form onSubmit={handleAddComment} className="flex gap-2">
+              <input
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Write a comment..."
+                className="flex-1 px-3 py-2 rounded bg-gray-700 outline-none text-sm"
+              />
+              <button
+                type="submit"
+                className="bg-green-500 hover:bg-green-600 px-4 py-2 rounded text-sm font-semibold"
+              >
+                Post
+              </button>
+            </form>
+          </>
+        )}
+
+        {activeTab === 'activity' && <ActivityFeed issueId={issue.id} />}
       </div>
     </div>
   )

@@ -3,6 +3,7 @@ import { useAuth } from './hooks/useAuth'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ProjectBoard from './pages/ProjectBoard'
+import IssueDetailPage from './pages/IssueDetailPage'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -43,6 +44,14 @@ function App() {
           element={
             <ProtectedRoute>
               <ProjectBoard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/project/:projectId/issue/:issueId"
+          element={
+            <ProtectedRoute>
+              <IssueDetailPage />
             </ProtectedRoute>
           }
         />

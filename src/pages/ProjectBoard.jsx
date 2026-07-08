@@ -4,7 +4,10 @@ import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from 
 import { useDroppable, useDraggable } from '@dnd-kit/core'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
-import IssueDetail from '../components/IssueDetail'
+import NotificationBell from '../components/NotificationBell'
+import SprintBar from '../components/SprintBar'
+import NewIssueModal from '../components/NewIssueModal'
+import IssueListView from '../components/IssueListView'
 
 const COLUMNS = [
   { id: 'todo', label: 'To Do' },
@@ -14,6 +17,19 @@ const COLUMNS = [
 ]
 
 const TYPE_ICON = { bug: '🐞', task: '✅', story: '📗' }
+
+const AVATAR_COLORS = ['bg-pink-500', 'bg-purple-500', 'bg-blue-500', 'bg-teal-500', 'bg-orange-500', 'bg-red-500']
+
+function getAvatarColor(name) {
+  if (!name) return 'bg-gray-500'
+  const index = name.charCodeAt(0) % AVATAR_COLORS.length
+  return AVATAR_COLORS[index]
+}
+
+function getInitials(name) {
+  if (!name) return '?'
+  return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
+}
 
 function IssueCard({ issue, onClick, members, projectKey }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: issue.id })
@@ -28,6 +44,9 @@ function IssueCard({ issue, onClick, members, projectKey }) {
     urgent: 'bg-red-500',
   }[issue.priority]
 
+  const assigneeName = members.find((m) => m.id === issue.assignee_id)?.name
+  const isOverdue = issue.due_date && new Date(issue.due_date) < new Date() && issue.status !== 'done'
+
   return (
     <div
       ref={setNodeRef}
@@ -41,13 +60,39 @@ function IssueCard({ issue, onClick, members, projectKey }) {
         <p className="text-sm font-medium text-white">{issue.title}</p>
         <span className={`w-2 h-2 rounded-full mt-1 flex-shrink-0 ml-2 ${priorityColor}`}></span>
       </div>
+
+      {issue.due_date && (
+        <span
+          className={`text-xs px-2 py-0.5 rounded mt-1 inline-block ${
+            isOverdue ? 'bg-red-500/20 text-red-400' : 'bg-gray-600 text-gray-300'
+          }`}
+        >
+          📅 {issue.due_date}
+        </span>
+      )}
+
+      {issue.labels && issue.labels.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-1">
+          {issue.labels.map((l) => (
+            <span key={l} className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-600 text-gray-300">
+              {l}
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="flex justify-between items-center mt-2">
         <span className="text-xs text-gray-400">
           {TYPE_ICON[issue.type] || ''} {projectKey}-{issue.issue_number || '—'}
         </span>
         {issue.assignee_id && (
-          <span className="text-xs bg-gray-600 text-gray-200 px-2 py-0.5 rounded-full">
-            {members.find((m) => m.id === issue.assignee_id)?.name?.split(' ')[0] || '?'}
+          <span
+            className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${getAvatarColor(
+              assigneeName
+            )}`}
+            title={assigneeName}
+          >
+            {getInitials(assigneeName)}
           </span>
         )}
       </div>
@@ -77,12 +122,10 @@ export default function ProjectBoard() {
   const [issues, setIssues] = useState([])
   const [members, setMembers] = useState([])
   const [showForm, setShowForm] = useState(false)
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [type, setType] = useState('task')
-  const [assigneeId, setAssigneeId] = useState('')
   const [filterAssignee, setFilterAssignee] = useState('all')
-  const [selectedIssue, setSelectedIssue] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [activeSprintId, setActiveSprintId] = useState(null)
+  const [viewMode, setViewMode] = useState('board') // 'board' | 'list'
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
@@ -102,31 +145,21 @@ export default function ProjectBoard() {
     setMembers(data || [])
   }
 
+  const fetchActiveSprint = async () => {
+    const { data } = await supabase
+      .from('sprints')
+      .select('id')
+      .eq('project_id', id)
+      .eq('status', 'active')
+      .maybeSingle()
+    if (data) setActiveSprintId(data.id)
+  }
+
   useEffect(() => {
     fetchData()
     fetchMembers()
+    fetchActiveSprint()
   }, [id])
-
-  const handleCreateIssue = async (e) => {
-    e.preventDefault()
-    const { error } = await supabase.from('issues').insert({
-      project_id: id,
-      title,
-      description,
-      type,
-      reporter_id: user.id,
-      assignee_id: assigneeId || null,
-    })
-    if (!error) {
-      setTitle('')
-      setDescription('')
-      setAssigneeId('')
-      setShowForm(false)
-      fetchData()
-    } else {
-      alert(error.message)
-    }
-  }
 
   const handleDragEnd = async (event) => {
     const { active, over } = event
@@ -146,6 +179,9 @@ export default function ProjectBoard() {
       .map((issue, index) => ({ ...issue, issue_number: index + 1 }))
       .filter((i) => {
         const statusMatch = i.status === colId
+        const searchMatch = i.title.toLowerCase().includes(searchQuery.toLowerCase())
+        const sprintMatch = activeSprintId === null ? !i.sprint_id : i.sprint_id === activeSprintId
+        if (!searchMatch || !sprintMatch) return false
         if (filterAssignee === 'all') return statusMatch
         if (filterAssignee === 'unassigned') return statusMatch && !i.assignee_id
         return statusMatch && i.assignee_id === filterAssignee
@@ -163,65 +199,50 @@ export default function ProjectBoard() {
           </button>
           <h1 className="text-lg font-bold">{project.name} <span className="text-gray-500">({project.key})</span></h1>
         </div>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="bg-green-500 hover:bg-green-600 px-4 py-2 rounded font-semibold text-sm"
-        >
-          + New Issue
-        </button>
+        <div className="flex items-center gap-4">
+          <NotificationBell />
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="bg-green-500 hover:bg-green-600 px-4 py-2 rounded font-semibold text-sm"
+          >
+            + New Issue
+          </button>
+        </div>
       </nav>
 
+      <SprintBar
+        projectId={id}
+        activeSprintId={activeSprintId}
+        onSprintChange={setActiveSprintId}
+      />
+
       {showForm && (
-        <form onSubmit={handleCreateIssue} className="bg-gray-800 p-4 m-6 rounded flex gap-3 items-end flex-wrap">
-          <div>
-            <label className="text-sm text-gray-400 block mb-1">Title</label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              className="px-3 py-2 rounded bg-gray-700 outline-none w-64"
-            />
-          </div>
-          <div>
-            <label className="text-sm text-gray-400 block mb-1">Description</label>
-            <input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="px-3 py-2 rounded bg-gray-700 outline-none w-64"
-            />
-          </div>
-          <div>
-            <label className="text-sm text-gray-400 block mb-1">Type</label>
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              className="px-3 py-2 rounded bg-gray-700 outline-none"
-            >
-              <option value="task">Task</option>
-              <option value="bug">Bug</option>
-              <option value="story">Story</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-sm text-gray-400 block mb-1">Assignee</label>
-            <select
-              value={assigneeId}
-              onChange={(e) => setAssigneeId(e.target.value)}
-              className="px-3 py-2 rounded bg-gray-700 outline-none"
-            >
-              <option value="">Unassigned</option>
-              {members.map((m) => (
-                <option key={m.id} value={m.id}>{m.name}</option>
-              ))}
-            </select>
-          </div>
-          <button type="submit" className="bg-green-500 hover:bg-green-600 px-4 py-2 rounded font-semibold">
-            Create
-          </button>
-        </form>
+        <NewIssueModal
+          projectId={id}
+          sprintId={activeSprintId}
+          reporterId={user.id}
+          members={members}
+          onClose={() => setShowForm(false)}
+          onCreated={fetchData}
+        />
       )}
 
-      <div className="px-6 pt-4 flex items-center gap-3">
+      <div className="px-6 pt-4 flex items-center gap-3 flex-wrap">
+        <div className="flex bg-gray-800 rounded overflow-hidden">
+          <button
+            onClick={() => setViewMode('board')}
+            className={`text-sm px-3 py-1.5 ${viewMode === 'board' ? 'bg-green-500 text-white' : 'text-gray-400'}`}
+          >
+            📋 Board
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`text-sm px-3 py-1.5 ${viewMode === 'list' ? 'bg-green-500 text-white' : 'text-gray-400'}`}
+          >
+            ☰ List
+          </button>
+        </div>
+
         <label className="text-sm text-gray-400">Filter by assignee:</label>
         <select
           value={filterAssignee}
@@ -234,30 +255,43 @@ export default function ProjectBoard() {
             <option key={m.id} value={m.id}>{m.name}</option>
           ))}
         </select>
+
+        <input
+          type="text"
+          placeholder="🔍 Search issues..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="px-3 py-1 rounded bg-gray-700 text-sm outline-none w-64"
+        />
       </div>
 
-      <div className="p-6 overflow-x-auto">
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <div className="flex gap-4">
-            {COLUMNS.map((col) => (
-              <Column
-                key={col.id}
-                column={col}
-                issues={filteredIssuesFor(col.id)}
-                onCardClick={setSelectedIssue}
-                members={members}
-                projectKey={project.key}
-              />
-            ))}
-          </div>
-        </DndContext>
-      </div>
-
-      {selectedIssue && (
-        <IssueDetail
-          issue={selectedIssue}
-          onClose={() => setSelectedIssue(null)}
-          onUpdate={fetchData}
+      {viewMode === 'board' ? (
+        <div className="p-6 overflow-x-auto">
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <div className="flex gap-4">
+              {COLUMNS.map((col) => (
+                <Column
+                  key={col.id}
+                  column={col}
+                  issues={filteredIssuesFor(col.id)}
+                  onCardClick={(issue) => navigate(`/project/${id}/issue/${issue.id}`)}
+                  members={members}
+                  projectKey={project.key}
+                />
+              ))}
+            </div>
+          </DndContext>
+        </div>
+      ) : (
+        <IssueListView
+          issues={issues.filter((i) => {
+            const sprintMatch = activeSprintId === null ? !i.sprint_id : i.sprint_id === activeSprintId
+            const searchMatch = i.title.toLowerCase().includes(searchQuery.toLowerCase())
+            return sprintMatch && searchMatch
+          })}
+          members={members}
+          projectKey={project.key}
+          onIssueClick={(issue) => navigate(`/project/${id}/issue/${issue.id}`)}
         />
       )}
     </div>
