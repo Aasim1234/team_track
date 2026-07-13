@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 
 export default function Login() {
@@ -9,7 +8,6 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -17,37 +15,14 @@ export default function Login() {
     setLoading(true)
 
     if (isSignUp) {
-      const { data, error } = await supabase.auth.signUp({
+      const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: { name },
         },
       })
-
-      if (error) {
-        setError(error.message)
-        setLoading(false)
-        return
-      }
-
-      // Fire off the admin notification email with the auto-generated license
-      // code. This is best-effort — if it fails (e.g. function not deployed
-      // yet), we still let the user proceed to the activation screen where
-      // they can be given the code manually.
-      if (data.user) {
-        try {
-          await supabase.functions.invoke('send-license-email', {
-            body: { name, email, userId: data.user.id },
-          })
-        } catch (fnError) {
-          console.warn('Could not send license email:', fnError)
-        }
-      }
-
-      setLoading(false)
-      navigate('/activate')
-      return
+      if (error) setError(error.message)
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) setError(error.message)
