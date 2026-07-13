@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
 import ActivityFeed from '../components/ActivityFeed'
-import { timeAgo } from '../lib/time'
+import CommentComposer, { renderMarkdown } from '../components/CommentComposer'
 
 const AVATAR_COLORS = ['bg-pink-500', 'bg-purple-500', 'bg-blue-500', 'bg-teal-500', 'bg-orange-500', 'bg-red-500']
 
@@ -17,6 +17,17 @@ function getInitials(name) {
   return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
+function timeAgo(dateStr) {
+  const seconds = Math.floor((new Date() - new Date(dateStr)) / 1000)
+  if (seconds < 60) return 'just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
 export default function IssueDetailPage() {
   const { projectId, issueId } = useParams()
   const navigate = useNavigate()
@@ -26,7 +37,6 @@ export default function IssueDetailPage() {
   const [issue, setIssue] = useState(null)
   const [members, setMembers] = useState([])
   const [comments, setComments] = useState([])
-  const [newComment, setNewComment] = useState('')
   const [activeTab, setActiveTab] = useState('comments')
   const [loading, setLoading] = useState(true)
 
@@ -58,38 +68,22 @@ export default function IssueDetailPage() {
     load()
   }, [issueId, projectId])
 
-  const handleAddComment = async (e) => {
-    e.preventDefault()
-    if (!newComment.trim()) return
+  const handleAddComment = async (text) => {
     const { error } = await supabase.from('comments').insert({
       issue_id: issueId,
       user_id: user.id,
-      body: newComment,
+      body: text,
     })
-    if (!error) {
-      setNewComment('')
-      fetchComments()
-    }
+    if (!error) fetchComments()
+  }
+
+  const handleToggleStatus = async (newStatus) => {
+    await updateField('status', newStatus)
   }
 
   const updateField = async (field, value) => {
     await supabase.from('issues').update({ [field]: value }).eq('id', issueId)
     fetchIssue()
-  }
-
-  const handleCloseOrReopen = async () => {
-    const trimmed = newComment.trim()
-    if (trimmed) {
-      await supabase.from('comments').insert({
-        issue_id: issueId,
-        user_id: user.id,
-        body: trimmed,
-      })
-      setNewComment('')
-    }
-    await supabase.from('issues').update({ status: issue.status === 'done' ? 'todo' : 'done' }).eq('id', issueId)
-    await fetchIssue()
-    await fetchComments()
   }
 
   if (loading || !issue || !project) {
@@ -122,7 +116,7 @@ export default function IssueDetailPage() {
               {isDone ? '✓ Done' : '○ Open'}
             </span>
             <span className="text-sm text-gray-500">
-              {project.key}-{issueId.slice(0, 4)} · opened {timeAgo(issue.created_at)}
+              {project.key}-{issue.issue_number ?? '—'} · opened {timeAgo(issue.created_at)}
               {reporter && ` by ${reporter.name}`}
             </span>
           </div>
@@ -164,7 +158,10 @@ export default function IssueDetailPage() {
                       <span className="text-sm font-semibold text-green-400">{c.profiles?.name || 'Unknown'}</span>
                       <span className="text-xs text-gray-500">{timeAgo(c.created_at)}</span>
                     </div>
-                    <p className="text-sm text-gray-300">{c.body}</p>
+                    <div
+                      className="text-sm text-gray-300"
+                      dangerouslySetInnerHTML={{ __html: renderMarkdown(c.body) }}
+                    />
                   </div>
                 ))}
                 {comments.length === 0 && (
@@ -172,37 +169,11 @@ export default function IssueDetailPage() {
                 )}
               </div>
 
-              <form onSubmit={handleAddComment} className="flex flex-col gap-2">
-                <textarea
-                  value={newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  placeholder="Write a comment..."
-                  rows={3}
-                  className="w-full px-3 py-2 rounded bg-gray-800 outline-none text-sm resize-y"
-                />
-                <div className="flex justify-between items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleCloseOrReopen}
-                    className={`px-4 py-2 rounded text-sm font-semibold border ${
-                      isDone
-                        ? 'border-green-500 text-green-400 hover:bg-green-500/10'
-                        : 'border-purple-500 text-purple-400 hover:bg-purple-500/10'
-                    }`}
-                  >
-                    {isDone
-                      ? (newComment.trim() ? 'Reopen with comment' : 'Reopen issue')
-                      : (newComment.trim() ? 'Close with comment' : 'Close issue')}
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={!newComment.trim()}
-                    className="bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 rounded text-sm font-semibold"
-                  >
-                    Comment
-                  </button>
-                </div>
-              </form>
+              <CommentComposer
+                onSubmit={handleAddComment}
+                issueStatus={issue.status}
+                onToggleStatus={handleToggleStatus}
+              />
             </>
           ) : (
             <div className="bg-gray-800 rounded-lg p-4">

@@ -31,6 +31,22 @@ function getInitials(name) {
   return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
+function CommentIcon({ className }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  )
+}
+
 function IssueCard({ issue, onClick, members, projectKey }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: issue.id })
   const style = transform
@@ -85,16 +101,24 @@ function IssueCard({ issue, onClick, members, projectKey }) {
         <span className="text-xs text-gray-400">
           {TYPE_ICON[issue.type] || ''} {projectKey}-{issue.issue_number || '—'}
         </span>
-        {issue.assignee_id && (
-          <span
-            className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${getAvatarColor(
-              assigneeName
-            )}`}
-            title={assigneeName}
-          >
-            {getInitials(assigneeName)}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {issue.comment_count > 0 && (
+            <span className="flex items-center gap-1 text-xs text-gray-400" title={`${issue.comment_count} comment${issue.comment_count > 1 ? 's' : ''}`}>
+              <CommentIcon className="w-3.5 h-3.5" />
+              {issue.comment_count}
+            </span>
+          )}
+          {issue.assignee_id && (
+            <span
+              className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${getAvatarColor(
+                assigneeName
+              )}`}
+              title={assigneeName}
+            >
+              {getInitials(assigneeName)}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -134,10 +158,13 @@ export default function ProjectBoard() {
     setProject(proj)
     const { data: iss } = await supabase
       .from('issues')
-      .select('*')
+      .select('*, comments(count)')
       .eq('project_id', id)
       .order('created_at', { ascending: true })
-    setIssues(iss || [])
+    // `comments(count)` comes back as `comments: [{ count: N }]` (a PostgREST
+    // aggregate on the related table) — flatten it to a plain number so
+    // components can just read `issue.comment_count`.
+    setIssues((iss || []).map((i) => ({ ...i, comment_count: i.comments?.[0]?.count ?? 0 })))
   }
 
   const fetchMembers = async () => {
@@ -176,6 +203,7 @@ export default function ProjectBoard() {
 
   const filteredIssuesFor = (colId) => {
     return issues
+      .map((issue, index) => ({ ...issue, issue_number: index + 1 }))
       .filter((i) => {
         const statusMatch = i.status === colId
         const searchMatch = i.title.toLowerCase().includes(searchQuery.toLowerCase())

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { timeAgo } from '../lib/time'
 
 const AVATAR_COLORS = ['bg-pink-500', 'bg-purple-500', 'bg-blue-500', 'bg-teal-500', 'bg-orange-500', 'bg-red-500']
 
@@ -12,17 +13,20 @@ function getInitials(name) {
   return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
 }
 
-function timeAgo(dateStr) {
-  const seconds = Math.floor((new Date() - new Date(dateStr)) / 1000)
-  if (seconds < 60) return 'just now'
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  if (days < 30) return `${days}d ago`
-  const months = Math.floor(days / 30)
-  return `${months}mo ago`
+function CommentIcon({ className }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  )
 }
 
 const TYPE_COLOR = {
@@ -151,10 +155,20 @@ export default function IssueListView({ issues, members, projectKey, onIssueClic
                   ))}
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  {projectKey}-{issue.issue_number ?? '—'} · opened {timeAgo(issue.created_at)}
+                  {projectKey}-{index + 1} · opened {timeAgo(issue.created_at)}
                   {reporter && ` by ${reporter.name}`}
                 </p>
               </div>
+
+              {issue.comment_count > 0 && (
+                <span
+                  className="flex items-center gap-1 text-xs text-gray-500 flex-shrink-0"
+                  title={`${issue.comment_count} comment${issue.comment_count > 1 ? 's' : ''}`}
+                >
+                  <CommentIcon className="w-4 h-4" />
+                  {issue.comment_count}
+                </span>
+              )}
 
               {assignee && (
                 <span
