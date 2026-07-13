@@ -183,67 +183,44 @@ export default function IssueDetailPage() {
         </div>
 
         {/* Sidebar */}
-        <div className="w-full lg:w-64 flex-shrink-0 space-y-5">
-          <div>
-            <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Assignee</p>
+        <div className="w-full lg:w-72 flex-shrink-0">
+          <div className="border-b border-gray-700 pb-4 mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <p className="text-xs text-gray-500 uppercase font-semibold">Assignee</p>
+            </div>
             <select
               value={issue.assignee_id || ''}
               onChange={(e) => updateField('assignee_id', e.target.value || null)}
-              className="w-full bg-gray-800 rounded px-2 py-1.5 text-sm outline-none"
+              className="w-full bg-transparent text-sm outline-none cursor-pointer hover:bg-gray-800 rounded px-1 py-1 -ml-1"
             >
-              <option value="">Unassigned</option>
+              <option value="" className="bg-gray-800">No one — assign someone</option>
               {members.map((m) => (
-                <option key={m.id} value={m.id}>{m.name}</option>
+                <option key={m.id} value={m.id} className="bg-gray-800">{m.name}</option>
               ))}
             </select>
           </div>
 
-          <div>
-            <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Status</p>
+          <div className="border-b border-gray-700 pb-4 mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <p className="text-xs text-gray-500 uppercase font-semibold">Status</p>
+            </div>
             <select
               value={issue.status}
               onChange={(e) => updateField('status', e.target.value)}
-              className="w-full bg-gray-800 rounded px-2 py-1.5 text-sm outline-none"
+              className="w-full bg-transparent text-sm outline-none cursor-pointer hover:bg-gray-800 rounded px-1 py-1 -ml-1"
             >
-              <option value="todo">To Do</option>
-              <option value="in_progress">In Progress</option>
-              <option value="in_review">In Review</option>
-              <option value="done">Done</option>
+              <option value="todo" className="bg-gray-800">To Do</option>
+              <option value="in_progress" className="bg-gray-800">In Progress</option>
+              <option value="in_review" className="bg-gray-800">In Review</option>
+              <option value="done" className="bg-gray-800">Done</option>
             </select>
           </div>
 
-          <div>
-            <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Type</p>
-            <p className="text-sm capitalize">{issue.type}</p>
-          </div>
-
-          <div>
-            <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Priority</p>
-            <select
-              value={issue.priority}
-              onChange={(e) => updateField('priority', e.target.value)}
-              className="w-full bg-gray-800 rounded px-2 py-1.5 text-sm outline-none"
-            >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
-            </select>
-          </div>
-
-          <div>
-            <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Due Date</p>
-            <input
-              type="date"
-              value={issue.due_date || ''}
-              onChange={(e) => updateField('due_date', e.target.value || null)}
-              className="w-full bg-gray-800 rounded px-2 py-1.5 text-sm outline-none"
-            />
-          </div>
-
-          {issue.labels && issue.labels.length > 0 && (
-            <div>
-              <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Labels</p>
+          <div className="border-b border-gray-700 pb-4 mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <p className="text-xs text-gray-500 uppercase font-semibold">Labels</p>
+            </div>
+            {issue.labels && issue.labels.length > 0 ? (
               <div className="flex flex-wrap gap-1">
                 {issue.labels.map((l) => (
                   <span key={l} className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-300">
@@ -251,12 +228,56 @@ export default function IssueDetailPage() {
                   </span>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <p className="text-sm text-gray-500">None yet</p>
+            )}
+          </div>
 
-          <div>
-            <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Project</p>
-            <p className="text-sm">{project.name} ({project.key})</p>
+          <div className="border-b border-gray-700 pb-4 mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <p className="text-xs text-gray-500 uppercase font-semibold">Type</p>
+            </div>
+            <p className="text-sm capitalize text-gray-300">{issue.type}</p>
+          </div>
+
+          <div className="border-b border-gray-700 pb-4 mb-4">
+            <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Fields</p>
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm text-gray-400">Priority</span>
+              <select
+                value={issue.priority}
+                onChange={(e) => updateField('priority', e.target.value)}
+                className="bg-transparent text-sm outline-none cursor-pointer hover:bg-gray-800 rounded px-1 py-0.5"
+              >
+                <option value="low" className="bg-gray-800">Low</option>
+                <option value="medium" className="bg-gray-800">Medium</option>
+                <option value="high" className="bg-gray-800">High</option>
+                <option value="urgent" className="bg-gray-800">Urgent</option>
+              </select>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-400">Due Date</span>
+              <input
+                type="date"
+                value={issue.due_date || ''}
+                onChange={(e) => updateField('due_date', e.target.value || null)}
+                className="bg-transparent text-sm outline-none cursor-pointer hover:bg-gray-800 rounded px-1 py-0.5 text-right"
+              />
+            </div>
+          </div>
+
+          <div className="border-b border-gray-700 pb-4 mb-4">
+            <div className="flex justify-between items-center mb-2">
+              <p className="text-xs text-gray-500 uppercase font-semibold">Project</p>
+            </div>
+            <p className="text-sm text-blue-400">{project.name} ({project.key})</p>
+          </div>
+
+          <div className="pb-4">
+            <div className="flex justify-between items-center mb-2">
+              <p className="text-xs text-gray-500 uppercase font-semibold">Milestone</p>
+            </div>
+            <p className="text-sm text-gray-500">No milestone</p>
           </div>
         </div>
       </div>
