@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { renderMarkdown } from './CommentComposer'
+import { uploadAttachment } from '../lib/attachments'
 
 const ISSUE_TYPES = [
   { value: 'bug', label: 'Bug', desc: 'An unexpected problem or behavior', color: 'text-red-400', icon: '●' },
@@ -32,10 +34,12 @@ function getInitials(name) {
 export default function NewIssueModal({ projectId, sprintId, reporterId, members, onClose, onCreated }) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [descTab, setDescTab] = useState('write') // 'write' | 'preview'
   const [type, setType] = useState('task')
   const [assigneeId, setAssigneeId] = useState('')
   const [selectedLabels, setSelectedLabels] = useState([])
   const [dueDate, setDueDate] = useState('')
+  const [pendingFiles, setPendingFiles] = useState([]) // { file, previewUrl, kind }
 
   const [showAssigneePicker, setShowAssigneePicker] = useState(false)
   const [showLabelPicker, setShowLabelPicker] = useState(false)
@@ -43,6 +47,8 @@ export default function NewIssueModal({ projectId, sprintId, reporterId, members
   const [assigneeSearch, setAssigneeSearch] = useState('')
   const [labelSearch, setLabelSearch] = useState('')
   const [saving, setSaving] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState('')
+  const fileInputRef = useRef(null)
 
   const filteredMembers = members.filter((m) =>
     m.name.toLowerCase().includes(assigneeSearch.toLowerCase())
@@ -57,26 +63,62 @@ export default function NewIssueModal({ projectId, sprintId, reporterId, members
     )
   }
 
+  const handleFilesSelected = (e) => {
+    const files = Array.from(e.target.files || [])
+    const newEntries = files.map((file) => ({
+      file,
+      previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+      kind: file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'file',
+    }))
+    setPendingFiles((prev) => [...prev, ...newEntries])
+    e.target.value = ''
+  }
+
+  const removePendingFile = (index) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!title.trim()) return
     setSaving(true)
-    const { error } = await supabase.from('issues').insert({
-      project_id: projectId,
-      sprint_id: sprintId,
-      title,
-      description,
-      type,
-      reporter_id: reporterId,
-      assignee_id: assigneeId || null,
-      labels: selectedLabels,
-      due_date: dueDate || null,
-    })
-    setSaving(false)
+
+    const { data: issue, error } = await supabase
+      .from('issues')
+      .insert({
+        project_id: projectId,
+        sprint_id: sprintId,
+        title,
+        description,
+        type,
+        reporter_id: reporterId,
+        assignee_id: assigneeId || null,
+        labels: selectedLabels,
+        due_date: dueDate || null,
+      })
+      .select()
+      .single()
+
     if (error) {
+      setSaving(false)
       alert(error.message)
       return
     }
+
+    // Upload any attached files now that we have a real issue id
+    if (pendingFiles.length > 0) {
+      for (let i = 0; i < pendingFiles.length; i++) {
+        setUploadProgress(`Uploading ${i + 1} of ${pendingFiles.length}...`)
+        try {
+          await uploadAttachment(pendingFiles[i].file, issue.id, reporterId)
+        } catch (uploadErr) {
+          console.warn('Attachment upload failed:', uploadErr)
+        }
+      }
+    }
+
+    setSaving(false)
+    setUploadProgress('')
     onCreated()
     onClose()
   }
@@ -104,13 +146,88 @@ export default function NewIssueModal({ projectId, sprintId, reporterId, members
             className="w-full px-3 py-2 rounded bg-gray-700 outline-none text-sm mb-3 font-medium"
           />
 
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Add a description..."
-            rows={6}
-            className="w-full px-3 py-2 rounded bg-gray-700 outline-none text-sm mb-4 resize-y"
-          />
+          {/* Description with Write/Preview tabs */}
+          <div className="bg-gray-900 rounded-lg overflow-hidden mb-4">
+            <div className="flex gap-4 px-3 pt-2 border-b border-gray-700">
+              <button
+                type="button"
+                onClick={() => setDescTab('write')}
+                className={`text-sm pb-2 ${descTab === 'write' ? 'text-white border-b-2 border-orange-500' : 'text-gray-500'}`}
+              >
+                Write
+              </button>
+              <button
+                type="button"
+                onClick={() => setDescTab('preview')}
+                className={`text-sm pb-2 ${descTab === 'preview' ? 'text-white border-b-2 border-orange-500' : 'text-gray-500'}`}
+              >
+                Preview
+              </button>
+            </div>
+            <div className="p-3">
+              {descTab === 'write' ? (
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Add a description... (Markdown supported: **bold**, *italic*, `code`, lists, etc.)"
+                  rows={6}
+                  className="w-full bg-transparent outline-none text-sm resize-y"
+                />
+              ) : (
+                <div
+                  className="text-sm min-h-[140px] text-gray-300"
+                  dangerouslySetInnerHTML={{
+                    __html: renderMarkdown(description) || '<span class="text-gray-500">Nothing to preview</span>',
+                  }}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Attachments */}
+          <div className="mb-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,video/*"
+              multiple
+              onChange={handleFilesSelected}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded flex items-center gap-1"
+            >
+              📎 Attach images or videos
+            </button>
+
+            {pendingFiles.length > 0 && (
+              <div className="grid grid-cols-3 gap-2 mt-3">
+                {pendingFiles.map((entry, index) => (
+                  <div key={index} className="relative bg-gray-900 rounded overflow-hidden group">
+                    {entry.kind === 'image' && (
+                      <img src={entry.previewUrl} alt={entry.file.name} className="w-full h-20 object-cover" />
+                    )}
+                    {entry.kind === 'video' && (
+                      <div className="w-full h-20 flex items-center justify-center text-2xl">🎬</div>
+                    )}
+                    {entry.kind === 'file' && (
+                      <div className="w-full h-20 flex items-center justify-center text-2xl">📄</div>
+                    )}
+                    <p className="text-[10px] text-gray-400 px-1 truncate">{entry.file.name}</p>
+                    <button
+                      type="button"
+                      onClick={() => removePendingFile(index)}
+                      className="absolute top-1 right-1 bg-black/70 text-white w-5 h-5 rounded-full text-xs opacity-0 group-hover:opacity-100"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="flex flex-wrap gap-2 mb-4">
             {/* Assignee picker */}
@@ -255,21 +372,24 @@ export default function NewIssueModal({ projectId, sprintId, reporterId, members
             </div>
           )}
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-gray-700">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded text-sm text-gray-300 hover:text-white"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving || !title.trim()}
-              className="bg-green-500 hover:bg-green-600 disabled:opacity-50 px-4 py-2 rounded text-sm font-semibold"
-            >
-              {saving ? 'Creating...' : 'Create'}
-            </button>
+          <div className="flex justify-between items-center pt-3 border-t border-gray-700">
+            <span className="text-xs text-gray-500">{uploadProgress}</span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded text-sm text-gray-300 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !title.trim()}
+                className="bg-green-500 hover:bg-green-600 disabled:opacity-50 px-4 py-2 rounded text-sm font-semibold"
+              >
+                {saving ? 'Creating...' : 'Create'}
+              </button>
+            </div>
           </div>
         </form>
       </div>

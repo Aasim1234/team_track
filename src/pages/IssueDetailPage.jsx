@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
 import ActivityFeed from '../components/ActivityFeed'
 import CommentComposer, { renderMarkdown } from '../components/CommentComposer'
+import { uploadAttachment, deleteAttachment } from '../lib/attachments'
 
 const AVATAR_COLORS = ['bg-pink-500', 'bg-purple-500', 'bg-blue-500', 'bg-teal-500', 'bg-orange-500', 'bg-red-500']
 
@@ -37,6 +38,8 @@ export default function IssueDetailPage() {
   const [issue, setIssue] = useState(null)
   const [members, setMembers] = useState([])
   const [comments, setComments] = useState([])
+  const [attachments, setAttachments] = useState([])
+  const [uploadingFile, setUploadingFile] = useState(false)
   const [activeTab, setActiveTab] = useState('comments')
   const [loading, setLoading] = useState(true)
 
@@ -54,6 +57,15 @@ export default function IssueDetailPage() {
     setComments(data || [])
   }
 
+  const fetchAttachments = async () => {
+    const { data } = await supabase
+      .from('attachments')
+      .select('*')
+      .eq('issue_id', issueId)
+      .order('created_at', { ascending: true })
+    setAttachments(data || [])
+  }
+
   useEffect(() => {
     const load = async () => {
       setLoading(true)
@@ -63,10 +75,33 @@ export default function IssueDetailPage() {
       setMembers(mem || [])
       await fetchIssue()
       await fetchComments()
+      await fetchAttachments()
       setLoading(false)
     }
     load()
   }, [issueId, projectId])
+
+  const handleFileUpload = async (e) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+    setUploadingFile(true)
+    for (const file of files) {
+      try {
+        await uploadAttachment(file, issueId, user.id)
+      } catch (err) {
+        alert(`Failed to upload ${file.name}: ${err.message}`)
+      }
+    }
+    setUploadingFile(false)
+    fetchAttachments()
+    e.target.value = ''
+  }
+
+  const handleDeleteAttachment = async (attachment) => {
+    if (!confirm(`Remove ${attachment.file_name}?`)) return
+    await deleteAttachment(attachment)
+    fetchAttachments()
+  }
 
   const handleAddComment = async (text) => {
     const { error } = await supabase.from('comments').insert({
@@ -121,10 +156,68 @@ export default function IssueDetailPage() {
             </span>
           </div>
 
-          <div className="bg-gray-800 rounded-lg p-4 mb-6">
-            <p className="text-sm text-gray-300 whitespace-pre-wrap">
-              {issue.description || 'No description provided.'}
-            </p>
+          <div className="bg-gray-800 rounded-lg p-4 mb-4">
+            {issue.description ? (
+              <div
+                className="text-sm text-gray-300"
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(issue.description) }}
+              />
+            ) : (
+              <p className="text-sm text-gray-500">No description provided.</p>
+            )}
+          </div>
+
+          <div className="mb-6">
+            <div className="flex justify-between items-center mb-2">
+              <p className="text-xs text-gray-500 uppercase font-semibold">
+                Attachments {attachments.length > 0 && `(${attachments.length})`}
+              </p>
+              <label className="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded cursor-pointer">
+                {uploadingFile ? 'Uploading...' : '📎 Add file'}
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  multiple
+                  onChange={handleFileUpload}
+                  disabled={uploadingFile}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {attachments.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {attachments.map((a) => (
+                  <div key={a.id} className="relative bg-gray-800 rounded-lg overflow-hidden group">
+                    {a.file_type === 'image' && (
+                      <a href={a.file_url} target="_blank" rel="noreferrer">
+                        <img src={a.file_url} alt={a.file_name} className="w-full h-28 object-cover" />
+                      </a>
+                    )}
+                    {a.file_type === 'video' && (
+                      <video src={a.file_url} controls className="w-full h-28 object-cover bg-black" />
+                    )}
+                    {a.file_type === 'file' && (
+                      <a
+                        href={a.file_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="w-full h-28 flex items-center justify-center text-3xl"
+                      >
+                        📄
+                      </a>
+                    )}
+                    <p className="text-[10px] text-gray-400 px-2 py-1 truncate">{a.file_name}</p>
+                    <button
+                      onClick={() => handleDeleteAttachment(a)}
+                      className="absolute top-1 right-1 bg-black/70 text-white w-5 h-5 rounded-full text-xs opacity-0 group-hover:opacity-100"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex gap-4 border-b border-gray-700 mb-4">
