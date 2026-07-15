@@ -150,11 +150,29 @@ export default function Login() {
 
   const handleOAuth = async (provider) => {
     resetMessages()
-    const { error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: window.location.origin },
+      options: { redirectTo: window.location.origin, skipBrowserRedirect: true },
     })
-    if (error) setError(friendlyError(error.message))
+    if (error) {
+      setError(friendlyError(error.message))
+      return
+    }
+    // Probe the authorize URL first — a disabled provider would otherwise
+    // dump the user on a raw JSON error page instead of this form.
+    try {
+      const res = await fetch(data.url, { redirect: 'manual' })
+      if (res.status === 400) {
+        const label = provider === 'google' ? 'Google' : 'GitHub'
+        setError(
+          `${label} sign-in isn't enabled for this workspace yet. An admin must enable the ${label} provider in Supabase → Authentication → Providers.`
+        )
+        return
+      }
+    } catch {
+      // If the probe itself fails (network/CORS), proceed with the normal flow
+    }
+    window.location.assign(data.url)
   }
 
   const handleForgotPassword = async () => {
