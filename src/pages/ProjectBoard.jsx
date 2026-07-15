@@ -9,6 +9,21 @@ import SprintBar from '../components/SprintBar'
 import NewIssueModal from '../components/NewIssueModal'
 import IssueListView from '../components/IssueListView'
 import AppSidebar, { recordRecentProject } from '../components/AppSidebar'
+import ProjectSummary from '../components/ProjectSummary'
+import ProjectCode from '../components/ProjectCode'
+import ProjectForms from '../components/ProjectForms'
+import ProjectTimeline from '../components/ProjectTimeline'
+import ProjectDocs from '../components/ProjectDocs'
+
+const TABS = [
+  { id: 'summary', label: 'Summary', icon: '🌐' },
+  { id: 'list', label: 'List', icon: '☰' },
+  { id: 'board', label: 'Board', icon: '📋' },
+  { id: 'code', label: 'Code', icon: '</>' },
+  { id: 'forms', label: 'Forms', icon: '📝' },
+  { id: 'timeline', label: 'Timeline', icon: '📈' },
+  { id: 'docs', label: 'Docs', icon: '📄' },
+]
 
 const COLUMNS = [
   { id: 'todo', label: 'To Do', dot: 'bg-gray-400' },
@@ -193,7 +208,7 @@ export default function ProjectBoard() {
   const [groupBy, setGroupBy] = useState('none')
   const [searchQuery, setSearchQuery] = useState('')
   const [activeSprintId, setActiveSprintId] = useState(null)
-  const [viewMode, setViewMode] = useState('board') // 'board' | 'list'
+  const [activeTab, setActiveTab] = useState('board')
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
@@ -311,11 +326,31 @@ export default function ProjectBoard() {
         </div>
       </nav>
 
-      <SprintBar
-        projectId={id}
-        activeSprintId={activeSprintId}
-        onSprintChange={setActiveSprintId}
-      />
+      {/* Jira-style project tabs */}
+      <div className="flex items-center gap-1 px-6 bg-gray-800/60 border-b border-gray-800 overflow-x-auto">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setActiveTab(t.id)}
+            className={`flex items-center gap-1.5 px-3 py-2.5 text-sm border-b-2 -mb-px whitespace-nowrap ${
+              activeTab === t.id
+                ? 'border-blue-400 text-blue-400 font-semibold'
+                : 'border-transparent text-gray-400 hover:text-white'
+            }`}
+          >
+            <span className="text-xs">{t.icon}</span>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {(activeTab === 'board' || activeTab === 'list') && (
+        <SprintBar
+          projectId={id}
+          activeSprintId={activeSprintId}
+          onSprintChange={setActiveSprintId}
+        />
+      )}
 
       {showForm && (
         <NewIssueModal
@@ -328,22 +363,8 @@ export default function ProjectBoard() {
         />
       )}
 
+      {(activeTab === 'board' || activeTab === 'list') && (
       <div className="px-6 pt-4 flex items-center gap-3 flex-wrap">
-        <div className="flex bg-gray-800 rounded overflow-hidden">
-          <button
-            onClick={() => setViewMode('board')}
-            className={`text-sm px-3 py-1.5 ${viewMode === 'board' ? 'bg-green-500 text-white' : 'text-gray-400'}`}
-          >
-            📋 Board
-          </button>
-          <button
-            onClick={() => setViewMode('list')}
-            className={`text-sm px-3 py-1.5 ${viewMode === 'list' ? 'bg-green-500 text-white' : 'text-gray-400'}`}
-          >
-            ☰ List
-          </button>
-        </div>
-
         {/* Search box with icon, Jira-style */}
         <div className="relative">
           <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 text-xs">🔍</span>
@@ -399,8 +420,21 @@ export default function ProjectBoard() {
           )}
         </div>
       </div>
+      )}
 
-      {viewMode === 'board' ? (
+      {activeTab === 'summary' && (
+        <ProjectSummary
+          issues={issues}
+          members={members}
+          onIssueClick={(issue) => navigate(`/project/${id}/issue/${issue.id}`)}
+        />
+      )}
+      {activeTab === 'code' && <ProjectCode projectId={id} />}
+      {activeTab === 'forms' && <ProjectForms projectId={id} onCreated={fetchData} />}
+      {activeTab === 'timeline' && <ProjectTimeline projectId={id} />}
+      {activeTab === 'docs' && <ProjectDocs projectId={id} />}
+
+      {activeTab === 'board' && (
         <div className="p-6 overflow-x-auto">
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             {swimlanes ? (
@@ -457,7 +491,8 @@ export default function ProjectBoard() {
             )}
           </DndContext>
         </div>
-      ) : (
+      )}
+      {activeTab === 'list' && (
         <IssueListView
           issues={issues.filter(baseFilter)}
           members={members}

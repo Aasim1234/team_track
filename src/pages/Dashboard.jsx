@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
 import NotificationBell from '../components/NotificationBell'
@@ -12,6 +12,14 @@ export default function Dashboard() {
   const [key, setKey] = useState('')
   const { user } = useAuth()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setShowForm(true)
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams])
 
   const fetchProjects = async () => {
     const { data, error } = await supabase

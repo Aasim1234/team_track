@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
 
@@ -27,6 +27,7 @@ export default function AppSidebar() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const { id: currentProjectId } = useParams()
+  const { pathname } = useLocation()
 
   const [projects, setProjects] = useState([])
   const [starredIds, setStarredIds] = useState(new Set())
@@ -88,9 +89,27 @@ export default function AppSidebar() {
         <nav className="space-y-0.5 mb-5">
           <button
             onClick={() => navigate('/dashboard')}
-            className="w-full text-left px-2 py-1.5 rounded hover:bg-gray-800 text-gray-300 flex items-center gap-2"
+            className={`w-full text-left px-2 py-1.5 rounded hover:bg-gray-800 flex items-center gap-2 ${
+              pathname === '/dashboard' ? 'bg-gray-800 text-white' : 'text-gray-300'
+            }`}
           >
             👤 For you
+          </button>
+          <button
+            onClick={() => navigate('/plans')}
+            className={`w-full text-left px-2 py-1.5 rounded hover:bg-gray-800 flex items-center gap-2 ${
+              pathname === '/plans' ? 'bg-gray-800 text-white' : 'text-gray-300'
+            }`}
+          >
+            🗺️ Plans
+          </button>
+          <button
+            onClick={() => navigate('/goals')}
+            className={`w-full text-left px-2 py-1.5 rounded hover:bg-gray-800 flex items-center gap-2 ${
+              pathname === '/goals' ? 'bg-gray-800 text-white' : 'text-gray-300'
+            }`}
+          >
+            🎯 Goals
           </button>
         </nav>
 
@@ -157,13 +176,22 @@ export default function AppSidebar() {
 
         {/* Spaces (all projects) */}
         <div>
-          <button
-            onClick={() => setSpacesOpen(!spacesOpen)}
-            className="w-full flex items-center justify-between px-2 py-1 text-xs text-gray-500 uppercase font-semibold hover:text-gray-300"
-          >
-            Spaces
-            <span className={`transition-transform ${spacesOpen ? '' : '-rotate-90'}`}>▾</span>
-          </button>
+          <div className="flex items-center px-2 py-1">
+            <button
+              onClick={() => setSpacesOpen(!spacesOpen)}
+              className="flex-1 flex items-center justify-between text-xs text-gray-500 uppercase font-semibold hover:text-gray-300"
+            >
+              Spaces
+              <span className={`transition-transform ${spacesOpen ? '' : '-rotate-90'}`}>▾</span>
+            </button>
+            <button
+              onClick={() => navigate('/dashboard?new=1')}
+              title="New space"
+              className="ml-2 text-gray-500 hover:text-white leading-none"
+            >
+              +
+            </button>
+          </div>
           {spacesOpen && (
             <div className="mt-1 space-y-0.5">
               {projects.map((p) => (
