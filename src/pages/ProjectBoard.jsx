@@ -2,9 +2,12 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { useDroppable, useDraggable } from '@dnd-kit/core'
+import {
+  Plus, GripVertical, Calendar, MessageSquare, Paperclip, Link as LinkIcon, Users,
+} from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
-import NotificationBell from '../components/NotificationBell'
+import TopNav from '../components/TopNav'
 import SprintBar from '../components/SprintBar'
 import NewIssueModal from '../components/NewIssueModal'
 import IssueListView from '../components/IssueListView'
@@ -26,11 +29,18 @@ const TABS = [
 ]
 
 const COLUMNS = [
-  { id: 'todo', label: 'To Do', dot: 'bg-gray-400' },
-  { id: 'in_progress', label: 'In Progress', dot: 'bg-blue-400' },
-  { id: 'in_review', label: 'In Review', dot: 'bg-yellow-400' },
-  { id: 'done', label: 'Done', dot: 'bg-green-400', check: true },
+  { id: 'todo', label: 'To Do', dot: 'bg-gray-400', bar: 'bg-gray-500' },
+  { id: 'in_progress', label: 'In Progress', dot: 'bg-blue-400', bar: 'bg-blue-500' },
+  { id: 'in_review', label: 'In Review', dot: 'bg-orange-400', bar: 'bg-orange-500' },
+  { id: 'done', label: 'Done', dot: 'bg-green-400', bar: 'bg-green-500', check: true },
 ]
+
+const PRIORITY_CHIP = {
+  low: 'bg-gray-500/15 text-gray-400',
+  medium: 'bg-blue-500/15 text-blue-400',
+  high: 'bg-orange-500/15 text-orange-400',
+  urgent: 'bg-red-500/15 text-red-400',
+}
 
 const TYPE_ICON = { bug: '🐞', task: '✅', story: '📗' }
 
@@ -54,13 +64,6 @@ function IssueCard({ issue, onClick, onDelete, members, projectKey }) {
     ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
     : undefined
 
-  const priorityColor = {
-    low: 'bg-gray-500',
-    medium: 'bg-blue-500',
-    high: 'bg-orange-500',
-    urgent: 'bg-red-500',
-  }[issue.priority]
-
   const assigneeName = members.find((m) => m.id === issue.assignee_id)?.name
   const isOverdue = issue.due_date && new Date(issue.due_date) < new Date() && issue.status !== 'done'
 
@@ -71,12 +74,15 @@ function IssueCard({ issue, onClick, onDelete, members, projectKey }) {
       {...listeners}
       {...attributes}
       onClick={() => onClick(issue)}
-      className="group relative bg-gray-700 hover:bg-gray-650 rounded-lg p-3 mb-2 cursor-pointer touch-none shadow-sm"
+      className="group relative bg-gray-700/80 border border-gray-600/40 hover:border-gray-500/60 rounded-xl p-3 mb-2 cursor-pointer touch-none card-lift"
     >
-      <div className="flex justify-between items-start gap-2">
-        <p className="text-sm font-medium text-white leading-snug">{issue.title}</p>
+      <div className="flex justify-between items-start gap-1.5">
+        <GripVertical
+          size={13}
+          className="text-gray-500 opacity-0 group-hover:opacity-70 flex-shrink-0 mt-0.5 -ml-1 cursor-grab"
+        />
+        <p className="text-[13px] font-medium text-white leading-snug flex-1">{issue.title}</p>
         <div className="flex items-center gap-1 flex-shrink-0">
-          <span className={`w-2 h-2 rounded-full ${priorityColor}`}></span>
           <div className="relative">
             <button
               onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu) }}
@@ -119,32 +125,46 @@ function IssueCard({ issue, onClick, onDelete, members, projectKey }) {
         </div>
       </div>
 
-      {issue.due_date && (
+      <div className="flex flex-wrap gap-1.5 mt-2">
         <span
-          className={`text-xs px-2 py-0.5 rounded mt-1.5 inline-flex items-center gap-1 ${
-            isOverdue ? 'bg-red-500/20 text-red-400' : 'bg-gray-600 text-gray-300'
+          className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md capitalize ${
+            PRIORITY_CHIP[issue.priority] || PRIORITY_CHIP.medium
           }`}
         >
-          📅 {issue.due_date}
+          {issue.priority}
         </span>
-      )}
+        {issue.due_date && (
+          <span
+            className={`text-[10px] px-1.5 py-0.5 rounded-md inline-flex items-center gap-1 ${
+              isOverdue ? 'bg-red-500/15 text-red-400' : 'bg-gray-600/50 text-gray-300'
+            }`}
+          >
+            <Calendar size={10} /> {issue.due_date}
+          </span>
+        )}
+        {issue.labels?.map((l) => (
+          <span key={l} className="text-[10px] px-1.5 py-0.5 rounded-md bg-gray-600/50 text-gray-300">
+            {l}
+          </span>
+        ))}
+      </div>
 
-      {issue.labels && issue.labels.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-1.5">
-          {issue.labels.map((l) => (
-            <span key={l} className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-600 text-gray-300">
-              {l}
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="flex justify-between items-center mt-2">
-        <span className="text-xs text-gray-400 flex items-center gap-1">
+      <div className="flex items-center gap-2.5 mt-2.5">
+        <span className="text-[11px] text-gray-500 font-medium flex items-center gap-1">
           {TYPE_ICON[issue.type] || ''} {projectKey}-{issue.issue_number || '—'}
         </span>
+        {issue._comments > 0 && (
+          <span className="text-[11px] text-gray-500 flex items-center gap-0.5">
+            <MessageSquare size={11} /> {issue._comments}
+          </span>
+        )}
+        {issue._attachments > 0 && (
+          <span className="text-[11px] text-gray-500 flex items-center gap-0.5">
+            <Paperclip size={11} /> {issue._attachments}
+          </span>
+        )}
         <span
-          className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${
+          className={`ml-auto w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${
             issue.assignee_id ? getAvatarColor(assigneeName) : 'bg-gray-600 border border-dashed border-gray-500'
           }`}
           title={assigneeName || 'Unassigned'}
@@ -156,31 +176,51 @@ function IssueCard({ issue, onClick, onDelete, members, projectKey }) {
   )
 }
 
-function Column({ column, droppableId, issues, onCardClick, onDeleteIssue, members, projectKey }) {
+function Column({ column, droppableId, issues, onCardClick, onDeleteIssue, onAddIssue, members, projectKey }) {
   const { setNodeRef } = useDroppable({ id: droppableId })
   return (
-    <div ref={setNodeRef} className="bg-gray-800 rounded-lg p-3 w-72 flex-shrink-0">
-      <h3 className="text-sm font-bold text-gray-300 mb-3 uppercase flex items-center gap-2">
-        {column.check ? (
-          <span className="text-green-400">✓</span>
-        ) : (
-          <span className={`w-2 h-2 rounded-full ${column.dot}`}></span>
+    <div className="w-72 flex-shrink-0">
+      <div className={`h-1 rounded-t-lg ${column.bar}`} />
+      <div
+        ref={setNodeRef}
+        className="bg-gray-800/70 border border-t-0 border-gray-600/25 rounded-b-xl p-2.5 min-h-[140px]"
+      >
+        <div className="flex items-center gap-2 px-1 pb-2.5">
+          {column.check ? (
+            <span className="text-green-400 text-xs">✓</span>
+          ) : (
+            <span className={`w-2 h-2 rounded-full ${column.dot}`}></span>
+          )}
+          <h3 className="text-[11px] font-bold text-gray-300 uppercase tracking-wider">
+            {column.label}
+          </h3>
+          <span className="text-[10px] font-semibold bg-gray-700 text-gray-400 px-1.5 py-0.5 rounded-full">
+            {issues.length}
+          </span>
+          <button
+            onClick={onAddIssue}
+            title={`Add issue to ${column.label}`}
+            className="ml-auto text-gray-500 hover:text-white p-1 rounded-md hover:bg-gray-700"
+          >
+            <Plus size={13} />
+          </button>
+        </div>
+        {issues.map((issue) => (
+          <IssueCard
+            key={issue.id}
+            issue={issue}
+            onClick={onCardClick}
+            onDelete={onDeleteIssue}
+            members={members}
+            projectKey={projectKey}
+          />
+        ))}
+        {issues.length === 0 && (
+          <div className="border border-dashed border-gray-600/40 rounded-lg py-5 text-center">
+            <p className="text-xs text-gray-500">No issues</p>
+          </div>
         )}
-        {column.label} <span className="text-gray-500 normal-case font-normal">{issues.length}</span>
-      </h3>
-      {issues.map((issue) => (
-        <IssueCard
-          key={issue.id}
-          issue={issue}
-          onClick={onCardClick}
-          onDelete={onDeleteIssue}
-          members={members}
-          projectKey={projectKey}
-        />
-      ))}
-      {issues.length === 0 && (
-        <p className="text-xs text-gray-600 text-center py-4">No issues</p>
-      )}
+      </div>
     </div>
   )
 }
@@ -220,7 +260,26 @@ export default function ProjectBoard() {
       .select('*')
       .eq('project_id', id)
       .order('created_at', { ascending: true })
-    setIssues(iss || [])
+
+    // Comment/attachment counts for card badges
+    const ids = (iss || []).map((i) => i.id)
+    const commentCounts = {}
+    const attachCounts = {}
+    if (ids.length > 0) {
+      const [{ data: cs }, { data: as }] = await Promise.all([
+        supabase.from('comments').select('issue_id').in('issue_id', ids),
+        supabase.from('attachments').select('issue_id').in('issue_id', ids),
+      ])
+      ;(cs || []).forEach((c) => { commentCounts[c.issue_id] = (commentCounts[c.issue_id] || 0) + 1 })
+      ;(as || []).forEach((a) => { attachCounts[a.issue_id] = (attachCounts[a.issue_id] || 0) + 1 })
+    }
+    setIssues(
+      (iss || []).map((i) => ({
+        ...i,
+        _comments: commentCounts[i.id] || 0,
+        _attachments: attachCounts[i.id] || 0,
+      }))
+    )
   }
 
   const fetchMembers = async () => {
@@ -302,29 +361,116 @@ export default function ProjectBoard() {
     swimlanes = Array.from(vals).map((val) => ({ value: val, label: TYPE_LABELS[val] || val }))
   }
 
-  if (!project) return <div className="min-h-screen bg-gray-900 text-white p-8">Loading...</div>
+  if (!project) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white flex">
+        <AppSidebar />
+        <div className="flex-1 min-w-0 p-6 animate-pulse">
+          <div className="h-8 w-64 bg-gray-800 rounded-lg mb-3" />
+          <div className="h-4 w-96 bg-gray-800 rounded-lg mb-8" />
+          <div className="flex gap-4">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="w-72 flex-shrink-0 space-y-2">
+                <div className="h-8 bg-gray-800 rounded-lg" />
+                <div className="h-24 bg-gray-800/70 rounded-xl" />
+                <div className="h-24 bg-gray-800/50 rounded-xl" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const doneCount = issues.filter((i) => i.status === 'done').length
+  const overdueCount = issues.filter(
+    (i) => i.due_date && new Date(i.due_date) < new Date() && i.status !== 'done'
+  ).length
+  const donePercent = issues.length > 0 ? Math.round((doneCount / issues.length) * 100) : 0
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex">
       <AppSidebar />
       <div className="flex-1 min-w-0">
-      <nav className="flex justify-between items-center px-8 py-4 bg-gray-800">
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/dashboard')} className="text-gray-400 hover:text-white">
-            &larr; Back
-          </button>
-          <h1 className="text-lg font-bold">{project.name} <span className="text-gray-500">({project.key})</span></h1>
+      <TopNav
+        breadcrumb={[{ label: 'Projects', to: '/dashboard' }, { label: project.name }]}
+        onQuickCreate={() => setShowForm(true)}
+        quickCreateLabel="New Task"
+      />
+
+      {/* Project header */}
+      <div className="px-6 pt-5 pb-4 animate-slide-up">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-bold tracking-tight">{project.name}</h1>
+          <span className="text-[11px] font-bold bg-blue-500/15 text-blue-400 px-2 py-1 rounded-md tracking-wide">
+            {project.key}
+          </span>
+          <span className="text-[11px] font-semibold bg-green-500/15 text-green-400 px-2 py-1 rounded-md flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" /> Active
+          </span>
+          <div className="ml-auto flex items-center gap-3">
+            <div className="flex -space-x-2 items-center" title={`${members.length} members`}>
+              {members.slice(0, 5).map((m) => (
+                <span
+                  key={m.id}
+                  title={m.name}
+                  className={`w-7 h-7 rounded-full ring-2 ring-gray-900 flex items-center justify-center text-[10px] font-bold text-white ${getAvatarColor(m.name)}`}
+                >
+                  {getInitials(m.name)}
+                </span>
+              ))}
+              {members.length > 5 && (
+                <span className="w-7 h-7 rounded-full ring-2 ring-gray-900 bg-gray-700 flex items-center justify-center text-[10px] font-bold text-gray-300">
+                  +{members.length - 5}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(window.location.href)
+                alert('Project link copied — share it to invite your team.')
+              }}
+              className="flex items-center gap-1.5 text-[13px] text-gray-300 bg-gray-800/80 border border-gray-600/40 hover:border-gray-500/60 px-3 py-1.5 rounded-lg"
+            >
+              <Users size={14} /> Invite
+            </button>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(window.location.href)
+              }}
+              title="Copy project link"
+              className="text-gray-400 hover:text-white p-2 rounded-lg bg-gray-800/80 border border-gray-600/40 hover:border-gray-500/60"
+            >
+              <LinkIcon size={14} />
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-4">
-          <NotificationBell />
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="bg-green-500 hover:bg-green-600 px-4 py-2 rounded font-semibold text-sm"
-          >
-            + Create
-          </button>
+        {project.description && (
+          <p className="text-sm text-gray-400 mt-1.5 max-w-2xl">{project.description}</p>
+        )}
+        <div className="flex items-center gap-4 mt-3 flex-wrap text-xs text-gray-400">
+          <span>
+            <span className="text-white font-semibold">{issues.length}</span> issues
+          </span>
+          <span>
+            <span className="text-green-400 font-semibold">{doneCount}</span> done
+          </span>
+          {overdueCount > 0 && (
+            <span>
+              <span className="text-red-400 font-semibold">{overdueCount}</span> overdue
+            </span>
+          )}
+          <div className="flex items-center gap-2">
+            <div className="w-36 bg-gray-600/40 rounded-full h-1.5">
+              <div
+                className="bg-gradient-to-r from-blue-500 to-green-500 h-1.5 rounded-full transition-all duration-500"
+                style={{ width: `${donePercent}%` }}
+              />
+            </div>
+            <span className="font-semibold text-white">{donePercent}%</span>
+          </div>
         </div>
-      </nav>
+      </div>
 
       {/* Jira-style project tabs */}
       <div className="flex items-center gap-1 px-6 bg-gray-800/60 border-b border-gray-800 overflow-x-auto">
@@ -462,6 +608,7 @@ export default function ProjectBoard() {
                           issues={filteredIssuesFor(col.id, lane.value)}
                           onCardClick={(issue) => navigate(`/project/${id}/issue/${issue.id}`)}
                           onDeleteIssue={handleDeleteIssue}
+                          onAddIssue={() => setShowForm(true)}
                           members={members}
                           projectKey={project.key}
                         />
@@ -483,6 +630,7 @@ export default function ProjectBoard() {
                     issues={issues.filter((i) => i.status === col.id && baseFilter(i))}
                     onCardClick={(issue) => navigate(`/project/${id}/issue/${issue.id}`)}
                     onDeleteIssue={handleDeleteIssue}
+                    onAddIssue={() => setShowForm(true)}
                     members={members}
                     projectKey={project.key}
                   />

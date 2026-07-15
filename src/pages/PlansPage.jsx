@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
 import AppSidebar from '../components/AppSidebar'
-import NotificationBell from '../components/NotificationBell'
+import TopNav from '../components/TopNav'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -136,10 +136,11 @@ export default function PlansPage() {
       <AppSidebar />
 
       <div className="flex-1 min-w-0">
-        <nav className="flex justify-between items-center px-8 py-4 bg-gray-800">
-          <h1 className="text-xl font-bold">Plans</h1>
-          <NotificationBell />
-        </nav>
+        <TopNav
+          breadcrumb={[{ label: 'My Workspace' }, { label: 'Plans' }]}
+          onQuickCreate={() => setShowForm(true)}
+          quickCreateLabel="New Plan"
+        />
 
         <div className="p-8">
           <div className="flex justify-between items-center mb-6">

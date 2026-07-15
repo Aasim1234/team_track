@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
 import AppSidebar from '../components/AppSidebar'
-import NotificationBell from '../components/NotificationBell'
+import TopNav from '../components/TopNav'
 
 const STATUS_OPTIONS = [
   { value: 'on_track', label: 'On track', classes: 'bg-green-500/20 text-green-400' },
@@ -76,10 +76,11 @@ export default function GoalsPage() {
       <AppSidebar />
 
       <div className="flex-1 min-w-0">
-        <nav className="flex justify-between items-center px-8 py-4 bg-gray-800">
-          <h1 className="text-xl font-bold">Goals</h1>
-          <NotificationBell />
-        </nav>
+        <TopNav
+          breadcrumb={[{ label: 'My Workspace' }, { label: 'Goals' }]}
+          onQuickCreate={() => setShowForm(true)}
+          quickCreateLabel="New Goal"
+        />
 
         <div className="p-8">
           <div className="flex justify-between items-center mb-6">

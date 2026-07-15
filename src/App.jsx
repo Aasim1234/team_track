@@ -6,6 +6,7 @@ import ProjectBoard from './pages/ProjectBoard'
 import IssueDetailPage from './pages/IssueDetailPage'
 import PlansPage from './pages/PlansPage'
 import GoalsPage from './pages/GoalsPage'
+import CommandPalette from './components/CommandPalette'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -24,6 +25,7 @@ function PublicRoute({ children }) {
 function App() {
   return (
     <BrowserRouter>
+      <CommandPalette />
       <Routes>
         <Route
           path="/login"
