@@ -160,6 +160,16 @@ body::before {
   from { opacity: 0; transform: scale(0.97); }
   to { opacity: 1; transform: scale(1); }
 }
+@keyframes tt-float {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  50% { transform: translateY(-22px) translateX(10px); }
+}
+.animate-float {
+  animation: tt-float 9s ease-in-out infinite;
+}
+.animate-float-slow {
+  animation: tt-float 14s ease-in-out infinite;
+}
 
 /* Smooth interactive elements everywhere */
 button, a, input, select, textarea {
