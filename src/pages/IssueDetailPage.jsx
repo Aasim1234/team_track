@@ -41,6 +41,12 @@ export default function IssueDetailPage() {
   const [attachments, setAttachments] = useState([])
   const [uploadingFile, setUploadingFile] = useState(false)
   const [activeTab, setActiveTab] = useState('comments')
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
+  const [editingDescription, setEditingDescription] = useState(false)
+  const [descriptionDraft, setDescriptionDraft] = useState('')
+  const [descEditTab, setDescEditTab] = useState('write')
+  const [showDescMenu, setShowDescMenu] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const fetchIssue = async () => {
@@ -121,6 +127,29 @@ export default function IssueDetailPage() {
     fetchIssue()
   }
 
+  const startEditingTitle = () => {
+    setTitleDraft(issue.title)
+    setEditingTitle(true)
+  }
+
+  const saveTitle = async () => {
+    if (!titleDraft.trim()) return
+    await updateField('title', titleDraft.trim())
+    setEditingTitle(false)
+  }
+
+  const startEditingDescription = () => {
+    setDescriptionDraft(issue.description || '')
+    setDescEditTab('write')
+    setEditingDescription(true)
+    setShowDescMenu(false)
+  }
+
+  const saveDescription = async () => {
+    await updateField('description', descriptionDraft)
+    setEditingDescription(false)
+  }
+
   if (loading || !issue || !project) {
     return <div className="min-h-screen bg-gray-900 text-white p-8">Loading...</div>
   }
@@ -144,7 +173,39 @@ export default function IssueDetailPage() {
       <div className="max-w-6xl mx-auto p-6 flex gap-8 flex-col lg:flex-row">
         {/* Main content */}
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold mb-2">{issue.title}</h1>
+          {editingTitle ? (
+            <div className="flex gap-2 mb-2">
+              <input
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                autoFocus
+                className="flex-1 text-2xl font-bold bg-gray-800 rounded px-3 py-1 outline-none"
+              />
+              <button
+                onClick={saveTitle}
+                className="bg-green-500 hover:bg-green-600 px-4 rounded text-sm font-semibold"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => setEditingTitle(false)}
+                className="bg-gray-700 hover:bg-gray-600 px-4 rounded text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <h1 className="text-2xl font-bold mb-2 group flex items-center gap-2">
+              {issue.title}
+              <button
+                onClick={startEditingTitle}
+                className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-white text-base"
+                title="Edit title"
+              >
+                ✏️
+              </button>
+            </h1>
+          )}
 
           <div className="flex items-center gap-2 mb-6 flex-wrap">
             <span className={`text-xs px-2 py-1 rounded-full font-semibold ${isDone ? 'bg-purple-600/30 text-purple-300' : 'bg-green-600/30 text-green-300'}`}>
@@ -157,13 +218,103 @@ export default function IssueDetailPage() {
           </div>
 
           <div className="bg-gray-800 rounded-lg p-4 mb-4">
-            {issue.description ? (
-              <div
-                className="text-sm text-gray-300"
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(issue.description) }}
-              />
+            {editingDescription ? (
+              <div>
+                <div className="flex gap-4 border-b border-gray-700 mb-2">
+                  <button
+                    onClick={() => setDescEditTab('write')}
+                    className={`text-sm pb-2 ${descEditTab === 'write' ? 'text-white border-b-2 border-orange-500' : 'text-gray-500'}`}
+                  >
+                    Write
+                  </button>
+                  <button
+                    onClick={() => setDescEditTab('preview')}
+                    className={`text-sm pb-2 ${descEditTab === 'preview' ? 'text-white border-b-2 border-orange-500' : 'text-gray-500'}`}
+                  >
+                    Preview
+                  </button>
+                </div>
+                {descEditTab === 'write' ? (
+                  <textarea
+                    value={descriptionDraft}
+                    onChange={(e) => setDescriptionDraft(e.target.value)}
+                    rows={6}
+                    autoFocus
+                    className="w-full bg-gray-900 rounded p-3 outline-none text-sm resize-y"
+                  />
+                ) : (
+                  <div
+                    className="text-sm text-gray-300 bg-gray-900 rounded p-3 min-h-[140px]"
+                    dangerouslySetInnerHTML={{
+                      __html: renderMarkdown(descriptionDraft) || '<span class="text-gray-500">Nothing to preview</span>',
+                    }}
+                  />
+                )}
+                <div className="flex justify-end gap-2 mt-3">
+                  <button
+                    onClick={() => setEditingDescription(false)}
+                    className="px-3 py-1.5 rounded text-sm text-gray-300 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveDescription}
+                    className="bg-green-500 hover:bg-green-600 px-4 py-1.5 rounded text-sm font-semibold"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
             ) : (
-              <p className="text-sm text-gray-500">No description provided.</p>
+              <>
+                <div className="flex justify-end relative mb-1">
+                  <button
+                    onClick={() => setShowDescMenu(!showDescMenu)}
+                    className="text-gray-500 hover:text-white px-2"
+                  >
+                    ⋯
+                  </button>
+                  {showDescMenu && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setShowDescMenu(false)}></div>
+                      <div className="absolute top-full right-0 mt-1 bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-20 py-1 w-40">
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(window.location.href)
+                            setShowDescMenu(false)
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700"
+                        >
+                          🔗 Copy link
+                        </button>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(issue.description || '')
+                            setShowDescMenu(false)
+                          }}
+                          className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700"
+                        >
+                          📋 Copy Markdown
+                        </button>
+                        <button
+                          onClick={startEditingDescription}
+                          className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-gray-700"
+                        >
+                          ✏️ Edit
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+                {issue.description ? (
+                  <div
+                    className="text-sm text-gray-300"
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(issue.description) }}
+                  />
+                ) : (
+                  <p className="text-sm text-gray-500">No description provided.</p>
+                )}
+              </>
             )}
           </div>
 
