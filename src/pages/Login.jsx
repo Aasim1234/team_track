@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Mail, Lock, User, Eye, EyeOff, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 
@@ -84,6 +84,20 @@ export default function Login() {
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [loading, setLoading] = useState(false)
+  const [providers, setProviders] = useState({ google: false, github: false })
+
+  // Only offer social logins that are actually enabled in Supabase,
+  // so users never land on a "provider is not enabled" dead end.
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/settings`, {
+      headers: { apikey: import.meta.env.VITE_SUPABASE_ANON_KEY },
+    })
+      .then((r) => r.json())
+      .then((s) =>
+        setProviders({ google: !!s.external?.google, github: !!s.external?.github })
+      )
+      .catch(() => {})
+  }, [])
 
   const resetMessages = () => {
     setError('')
@@ -213,9 +227,7 @@ export default function Login() {
             <span className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-green-500 flex items-center justify-center text-sm font-extrabold text-white shadow-lg shadow-blue-500/25 mb-4">
               TT
             </span>
-            <h1 className="text-[26px] font-bold text-white tracking-tight">
-              {isSignUp ? 'Create your account' : 'Welcome back'}
-            </h1>
+            <h1 className="text-[26px] font-bold text-white tracking-tight">Team Tracker</h1>
             <p className="text-gray-400 text-sm mt-1">
               {isSignUp ? 'Start tracking work with your team' : 'Sign in to your workspace'}
             </p>
@@ -356,32 +368,40 @@ export default function Login() {
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="flex items-center gap-3 my-5" aria-hidden="true">
-            <span className="flex-1 h-px bg-gray-600/40" />
-            <span className="text-[11px] text-gray-500 font-semibold tracking-wider">OR</span>
-            <span className="flex-1 h-px bg-gray-600/40" />
-          </div>
+          {(providers.google || providers.github) && (
+            <>
+              {/* Divider */}
+              <div className="flex items-center gap-3 my-5" aria-hidden="true">
+                <span className="flex-1 h-px bg-gray-600/40" />
+                <span className="text-[11px] text-gray-500 font-semibold tracking-wider">OR</span>
+                <span className="flex-1 h-px bg-gray-600/40" />
+              </div>
 
-          {/* Social auth */}
-          <div className="space-y-2.5">
-            <button
-              type="button"
-              onClick={() => handleOAuth('google')}
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2.5 bg-gray-700/60 hover:bg-gray-700 border border-gray-600/50 hover:border-gray-500/70 text-white text-[13px] font-medium py-2.5 rounded-xl disabled:opacity-50"
-            >
-              <GoogleIcon /> Continue with Google
-            </button>
-            <button
-              type="button"
-              onClick={() => handleOAuth('github')}
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2.5 bg-gray-700/60 hover:bg-gray-700 border border-gray-600/50 hover:border-gray-500/70 text-white text-[13px] font-medium py-2.5 rounded-xl disabled:opacity-50"
-            >
-              <GithubIcon /> Continue with GitHub
-            </button>
-          </div>
+              {/* Social auth — only providers enabled in Supabase */}
+              <div className="space-y-2.5">
+                {providers.google && (
+                  <button
+                    type="button"
+                    onClick={() => handleOAuth('google')}
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-2.5 bg-gray-700/60 hover:bg-gray-700 border border-gray-600/50 hover:border-gray-500/70 text-white text-[13px] font-medium py-2.5 rounded-xl disabled:opacity-50"
+                  >
+                    <GoogleIcon /> Continue with Google
+                  </button>
+                )}
+                {providers.github && (
+                  <button
+                    type="button"
+                    onClick={() => handleOAuth('github')}
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-2.5 bg-gray-700/60 hover:bg-gray-700 border border-gray-600/50 hover:border-gray-500/70 text-white text-[13px] font-medium py-2.5 rounded-xl disabled:opacity-50"
+                  >
+                    <GithubIcon /> Continue with GitHub
+                  </button>
+                )}
+              </div>
+            </>
+          )}
 
           <p className="text-gray-400 text-[13px] mt-6 text-center">
             {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
