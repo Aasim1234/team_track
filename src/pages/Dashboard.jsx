@@ -5,8 +5,8 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
-import AppSidebar from '../components/AppSidebar'
-import TopNav from '../components/TopNav'
+import ProjectSidebar from '../components/ProjectSidebar'
+import AppHeader from '../components/AppHeader'
 
 function StatCard({ icon: Icon, label, value, tint, delay }) {
   return (
@@ -100,10 +100,10 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex">
-      <AppSidebar />
+      <ProjectSidebar />
 
       <div className="flex-1 min-w-0">
-        <TopNav
+        <AppHeader
           breadcrumb={[{ label: 'My Workspace' }, { label: 'Projects' }]}
           onQuickCreate={() => setShowForm(true)}
           quickCreateLabel="New Project"

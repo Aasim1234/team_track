@@ -2,59 +2,63 @@
 @import "tailwindcss";
 
 /* ============================================
-   PREMIUM DESIGN TOKENS
+   ENTERPRISE DESIGN TOKENS
    Remapping Tailwind's palette to the design system
    means every existing utility class adopts it.
+   Light is the default (matches TestRail/Jira-admin
+   conventions); dark is available via the .dark class.
    ============================================ */
 @theme {
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
 
-  /* Neutral scale → premium dark palette */
+  /* Neutral scale → light enterprise palette (default) */
+  --color-gray-950: #cbd5e1;
+  --color-gray-900: #F4F6F8; /* app background */
+  --color-gray-800: #FFFFFF; /* surface (header, sidebar, panels) */
+  --color-gray-700: #F8FAFC; /* card / input background */
+  --color-gray-650: #F1F5F9; /* hover background */
+  --color-gray-600: #E2E8F0; /* border */
+  --color-gray-500: #64748B; /* tertiary text */
+  --color-gray-400: #475569; /* secondary text */
+  --color-gray-300: #1E293B; /* near-primary text */
+  --color-white: #0F172A;    /* primary text (flips to real white under .dark) */
+
+  /* Semantic accents — unchanged in both themes */
+  --color-blue-500: #3B82F6;
+  --color-blue-400: #2563EB;
+  --color-green-500: #22C55E;
+  --color-green-600: #16A34A;
+  --color-green-400: #16A34A;
+  --color-orange-500: #F59E0B;
+  --color-orange-400: #D97706;
+  --color-red-500: #EF4444;
+  --color-red-400: #DC2626;
+
+  /* Compact radius system — 4/6/8px only, never larger */
+  --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
+  --shadow-sm: 0 1px 3px 0 rgb(15 23 42 / 0.08), 0 1px 2px -1px rgb(15 23 42 / 0.06);
+  --shadow-md: 0 4px 12px -2px rgb(15 23 42 / 0.10), 0 2px 4px -2px rgb(15 23 42 / 0.06);
+}
+
+/* ============================================
+   DARK MODE — optional, flips the same tokens
+   ============================================ */
+:root.dark {
   --color-gray-950: #070d1a;
   --color-gray-900: #0B1220; /* app background */
   --color-gray-800: #111827; /* surface */
   --color-gray-700: #1F2937; /* card */
-  --color-gray-650: #26334a; /* card hover */
+  --color-gray-650: #26334a; /* hover background */
   --color-gray-600: #2D3748; /* border */
   --color-gray-500: #64748B;
-  --color-gray-400: #94A3B8; /* text secondary */
+  --color-gray-400: #94A3B8;
   --color-gray-300: #CBD5E1;
-
-  /* Semantic accents */
-  --color-blue-500: #3B82F6;
-  --color-blue-400: #60A5FA;
-  --color-green-500: #22C55E;
-  --color-green-600: #16A34A;
-  --color-green-400: #4ADE80;
-  --color-orange-500: #F59E0B;
-  --color-orange-400: #FBBF24;
-  --color-red-500: #EF4444;
-  --color-red-400: #F87171;
-
-  /* Rounded corners: 12–16px system */
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-}
-
-/* ============================================
-   LIGHT MODE — flips the same tokens at runtime
-   ============================================ */
-:root.light {
-  --color-gray-950: #cbd5e1;
-  --color-gray-900: #eef2f7; /* app background */
-  --color-gray-800: #ffffff; /* surface */
-  --color-gray-700: #f1f5f9; /* card */
-  --color-gray-650: #e2e8f0; /* card hover */
-  --color-gray-600: #cbd5e1; /* border */
-  --color-gray-500: #64748b;
-  --color-gray-400: #475569; /* text secondary */
-  --color-gray-300: #334155;
-  --color-white: #0f172a;    /* primary text flips dark */
-  color-scheme: light;
+  --color-white: #FFFFFF;    /* primary text back to real white */
+  color-scheme: dark;
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 /* ============================================
@@ -67,25 +71,13 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* Subtle top gradient glow — premium ambient light */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background:
-    radial-gradient(900px 420px at 75% -10%, color-mix(in srgb, var(--color-blue-500) 9%, transparent), transparent 70%),
-    radial-gradient(700px 380px at 10% -10%, color-mix(in srgb, var(--color-green-500) 5%, transparent), transparent 70%);
-}
-
 #root {
   position: relative;
   z-index: 1;
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--color-blue-500) 35%, transparent);
+  background: color-mix(in srgb, var(--color-blue-500) 30%, transparent);
 }
 
 /* Thin custom scrollbars */
@@ -118,15 +110,15 @@ body::before {
    COMPONENT UTILITIES
    ============================================ */
 @layer components {
-  /* Glassmorphism surface */
+  /* Solid enterprise panel — used by modals, dropdowns, command palette */
   .glass {
-    background: color-mix(in srgb, var(--color-gray-800) 78%, transparent);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border: 1px solid color-mix(in srgb, var(--color-gray-600) 55%, transparent);
+    background: var(--color-gray-800);
+    border: 1px solid var(--color-gray-600);
+    box-shadow: var(--shadow-md);
   }
 
-  /* Card hover lift */
+  /* Legacy hover-lift, kept for not-yet-restyled "Classic" pages only —
+     do not use in new/rewritten components (flat hover states instead). */
   .card-lift {
     transition: transform 250ms ease, box-shadow 250ms ease, background-color 250ms ease, border-color 250ms ease;
   }
@@ -138,13 +130,10 @@ body::before {
   }
 
   .animate-fade-in {
-    animation: tt-fade-in 250ms ease both;
-  }
-  .animate-slide-up {
-    animation: tt-slide-up 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: tt-fade-in 200ms ease both;
   }
   .animate-scale-in {
-    animation: tt-scale-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: tt-scale-in 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 }
 
@@ -152,26 +141,19 @@ body::before {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-@keyframes tt-slide-up {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
 @keyframes tt-scale-in {
   from { opacity: 0; transform: scale(0.97); }
   to { opacity: 1; transform: scale(1); }
 }
-@keyframes tt-float {
-  0%, 100% { transform: translateY(0) translateX(0); }
-  50% { transform: translateY(-22px) translateX(10px); }
-}
-.animate-float {
-  animation: tt-float 9s ease-in-out infinite;
-}
-.animate-float-slow {
-  animation: tt-float 14s ease-in-out infinite;
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in, .animate-scale-in, .card-lift {
+    animation: none !important;
+    transition: none !important;
+  }
 }
 
 /* Smooth interactive elements everywhere */
 button, a, input, select, textarea {
-  transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease, opacity 200ms ease, transform 200ms ease, box-shadow 200ms ease;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, opacity 150ms ease, box-shadow 150ms ease;
 }

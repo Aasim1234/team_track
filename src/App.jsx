@@ -1,6 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { PlayCircle, Flag, BarChart3, CheckSquare } from 'lucide-react'
+import {
+  PlayCircle, Flag, BarChart3, CheckSquare, Sparkles, SlidersHorizontal, Plug, Database, Settings,
+} from 'lucide-react'
 import { useAuth } from './hooks/useAuth'
+import { useProjectAdminAccess } from './hooks/useProjectAdminAccess'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ProjectBoard from './pages/ProjectBoard'
@@ -11,11 +14,26 @@ import ProjectOverviewPage from './pages/ProjectOverviewPage'
 import TestCasesPage from './pages/TestCasesPage'
 import CommandPalette from './components/CommandPalette'
 import ComingSoonPage from './components/ComingSoonPage'
+import AdminOverviewPage from './pages/admin/AdminOverviewPage'
+import AdminProjectsPage from './pages/admin/AdminProjectsPage'
+import AdminUsersRolesPage from './pages/admin/AdminUsersRolesPage'
+import AdminPlaceholderPage from './pages/admin/AdminPlaceholderPage'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">Loading...</div>
   if (!user) return <Navigate to="/login" replace />
+  return children
+}
+
+function AdminRoute({ children }) {
+  const { user, loading: authLoading } = useAuth()
+  const { isAdmin, loading: adminLoading } = useProjectAdminAccess()
+  if (authLoading || adminLoading) {
+    return <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">Loading...</div>
+  }
+  if (!user) return <Navigate to="/login" replace />
+  if (!isAdmin) return <Navigate to="/dashboard" replace />
   return children
 }
 
@@ -61,6 +79,70 @@ function App() {
             <ProtectedRoute>
               <GoalsPage />
             </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <AdminOverviewPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/projects"
+          element={
+            <AdminRoute>
+              <AdminProjectsPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <AdminRoute>
+              <AdminUsersRolesPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/ai-hub"
+          element={
+            <AdminRoute>
+              <AdminPlaceholderPage title="AI Hub" icon={Sparkles} description="AI-assisted test generation and suggestions will live here." />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/customizations"
+          element={
+            <AdminRoute>
+              <AdminPlaceholderPage title="Customizations" icon={SlidersHorizontal} description="Custom fields, statuses, and templates will be configurable here." />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/integration"
+          element={
+            <AdminRoute>
+              <AdminPlaceholderPage title="Integration" icon={Plug} description="Jira, GitHub, GitLab, and CI/CD integrations will be configurable here." />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/data-management"
+          element={
+            <AdminRoute>
+              <AdminPlaceholderPage title="Data Management" icon={Database} description="Storage usage, exports, and attachment management will live here." />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/site-settings"
+          element={
+            <AdminRoute>
+              <AdminPlaceholderPage title="Site Settings" icon={Settings} description="General, security, authentication, and email settings will live here." />
+            </AdminRoute>
           }
         />
         <Route

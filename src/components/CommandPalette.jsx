@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
-import { recordRecentProject } from './AppSidebar'
+import { recordRecentProject } from '../lib/recentProjects'
 
 const ACTIONS = [
   { id: 'nav-dashboard', label: 'Go to Dashboard', icon: LayoutDashboard, to: '/dashboard' },

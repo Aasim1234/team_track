@@ -7,11 +7,12 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
-import TopNav from '../components/TopNav'
+import AppHeader from '../components/AppHeader'
 import SprintBar from '../components/SprintBar'
 import NewIssueModal from '../components/NewIssueModal'
 import IssueListView from '../components/IssueListView'
-import AppSidebar, { recordRecentProject } from '../components/AppSidebar'
+import ProjectSidebar from '../components/ProjectSidebar'
+import { recordRecentProject } from '../lib/recentProjects'
 import ProjectSummary from '../components/ProjectSummary'
 import ProjectCode from '../components/ProjectCode'
 import ProjectForms from '../components/ProjectForms'
@@ -364,7 +365,7 @@ export default function ProjectBoard() {
   if (!project) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex">
-        <AppSidebar />
+        <ProjectSidebar />
         <div className="flex-1 min-w-0 p-6 animate-pulse">
           <div className="h-8 w-64 bg-gray-800 rounded-lg mb-3" />
           <div className="h-4 w-96 bg-gray-800 rounded-lg mb-8" />
@@ -390,9 +391,9 @@ export default function ProjectBoard() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex">
-      <AppSidebar />
+      <ProjectSidebar />
       <div className="flex-1 min-w-0">
-      <TopNav
+      <AppHeader
         breadcrumb={[{ label: 'Projects', to: '/dashboard' }, { label: project.name }]}
         onQuickCreate={() => setShowForm(true)}
         quickCreateLabel="New Task"

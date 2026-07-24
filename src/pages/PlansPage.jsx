@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
-import AppSidebar from '../components/AppSidebar'
-import TopNav from '../components/TopNav'
+import ProjectSidebar from '../components/ProjectSidebar'
+import AppHeader from '../components/AppHeader'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -133,10 +133,10 @@ export default function PlansPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex">
-      <AppSidebar />
+      <ProjectSidebar />
 
       <div className="flex-1 min-w-0">
-        <TopNav
+        <AppHeader
           breadcrumb={[{ label: 'My Workspace' }, { label: 'Plans' }]}
           onQuickCreate={() => setShowForm(true)}
           quickCreateLabel="New Plan"

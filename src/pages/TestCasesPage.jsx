@@ -5,8 +5,8 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
-import AppSidebar from '../components/AppSidebar'
-import TopNav from '../components/TopNav'
+import ProjectSidebar from '../components/ProjectSidebar'
+import AppHeader from '../components/AppHeader'
 import NewTestCaseModal from '../components/NewTestCaseModal'
 import TestCaseStepsEditor from '../components/TestCaseStepsEditor'
 import CommentComposer from '../components/CommentComposer'
@@ -227,7 +227,7 @@ export default function TestCasesPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex">
-        <AppSidebar />
+        <ProjectSidebar />
         <div className="flex-1 min-w-0 p-6 animate-pulse">
           <div className="h-8 w-64 bg-gray-800 rounded-lg mb-4" />
           <div className="flex gap-4">
@@ -256,9 +256,9 @@ export default function TestCasesPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex">
-      <AppSidebar />
+      <ProjectSidebar />
       <div className="flex-1 min-w-0">
-        <TopNav
+        <AppHeader
           breadcrumb={[{ label: 'Projects', to: '/dashboard' }, { label: project?.name, to: `/project/${projectId}/overview` }, { label: 'Test Cases' }]}
           onQuickCreate={canAuthor ? () => setShowNewCase(true) : undefined}
           quickCreateLabel="New Test Case"
@@ -474,7 +474,7 @@ function TestCaseDetail({ projectId, caseId, project, sectionsWithPath, members,
   if (loading || !testCase) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex">
-        <AppSidebar />
+        <ProjectSidebar />
         <div className="flex-1 p-6 animate-pulse">
           <div className="h-8 w-96 bg-gray-800 rounded-lg" />
         </div>
@@ -486,9 +486,9 @@ function TestCaseDetail({ projectId, caseId, project, sectionsWithPath, members,
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex">
-      <AppSidebar />
+      <ProjectSidebar />
       <div className="flex-1 min-w-0">
-        <TopNav
+        <AppHeader
           breadcrumb={[
             { label: 'Projects', to: '/dashboard' },
             { label: project?.name, to: `/project/${projectId}/overview` },

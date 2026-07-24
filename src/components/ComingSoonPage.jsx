@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from 'react-router-dom'
-import AppSidebar from './AppSidebar'
-import TopNav from './TopNav'
+import ProjectSidebar from './ProjectSidebar'
+import AppHeader from './AppHeader'
 
 export default function ComingSoonPage({ title, description, icon: Icon, phase }) {
   const { id } = useParams()
@@ -8,9 +8,9 @@ export default function ComingSoonPage({ title, description, icon: Icon, phase }
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex">
-      <AppSidebar />
+      <ProjectSidebar />
       <div className="flex-1 min-w-0">
-        <TopNav breadcrumb={[{ label: 'Projects', to: '/dashboard' }, { label: title }]} />
+        <AppHeader breadcrumb={[{ label: 'Projects', to: '/dashboard' }, { label: title }]} />
         <div className="flex flex-col items-center justify-center text-center px-6 py-24 animate-fade-in">
           <span className="inline-flex w-14 h-14 rounded-2xl bg-blue-500/10 text-blue-400 items-center justify-center mb-4">
             <Icon size={26} />

@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ListChecks, FolderTree, Users, ArrowUpRight } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
-import AppSidebar from '../components/AppSidebar'
-import TopNav from '../components/TopNav'
+import ProjectSidebar from '../components/ProjectSidebar'
+import AppHeader from '../components/AppHeader'
 
 const TYPE_LABELS = {
   functional: 'Functional', regression: 'Regression', smoke: 'Smoke', sanity: 'Sanity',
@@ -86,7 +86,7 @@ export default function ProjectOverviewPage() {
   if (loading || !project) {
     return (
       <div className="min-h-screen bg-gray-900 text-white flex">
-        <AppSidebar />
+        <ProjectSidebar />
         <div className="flex-1 min-w-0 p-6 animate-pulse">
           <div className="h-8 w-64 bg-gray-800 rounded-lg mb-3" />
           <div className="h-4 w-96 bg-gray-800 rounded-lg mb-8" />
@@ -103,9 +103,9 @@ export default function ProjectOverviewPage() {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex">
-      <AppSidebar />
+      <ProjectSidebar />
       <div className="flex-1 min-w-0">
-        <TopNav
+        <AppHeader
           breadcrumb={[{ label: 'Projects', to: '/dashboard' }, { label: project.name }]}
           onQuickCreate={() => navigate(`/project/${id}/cases`)}
           quickCreateLabel="New Test Case"
