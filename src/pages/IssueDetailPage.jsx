@@ -30,7 +30,7 @@ function timeAgo(dateStr) {
 }
 
 export default function IssueDetailPage() {
-  const { projectId, issueId } = useParams()
+  const { id: projectId, issueId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
 
@@ -161,7 +161,7 @@ export default function IssueDetailPage() {
     <div className="min-h-screen bg-gray-900 text-white">
       <nav className="flex items-center gap-3 px-8 py-4 bg-gray-800">
         <button
-          onClick={() => navigate(`/project/${projectId}`)}
+          onClick={() => navigate(`/project/${projectId}/classic`)}
           className="text-gray-400 hover:text-white"
         >
           &larr; Back to board

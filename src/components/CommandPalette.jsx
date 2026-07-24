@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Search, LayoutDashboard, Map, Target, Plus, FolderKanban, CircleDot, CornerDownLeft,
+  Search, LayoutDashboard, Map, Target, Plus, FolderKanban, CircleDot, CornerDownLeft, ListChecks,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
@@ -21,6 +21,7 @@ export default function CommandPalette() {
   const [query, setQuery] = useState('')
   const [projects, setProjects] = useState([])
   const [issues, setIssues] = useState([])
+  const [testCases, setTestCases] = useState([])
   const [selected, setSelected] = useState(0)
   const inputRef = useRef(null)
   const debounceRef = useRef(null)
@@ -48,6 +49,7 @@ export default function CommandPalette() {
     if (!open) return
     setQuery('')
     setIssues([])
+    setTestCases([])
     setSelected(0)
     setTimeout(() => inputRef.current?.focus(), 30)
     supabase
@@ -57,21 +59,23 @@ export default function CommandPalette() {
       .then(({ data }) => setProjects(data || []))
   }, [open])
 
-  // Debounced issue search
+  // Debounced issue + test case search
   useEffect(() => {
     if (!open) return
     clearTimeout(debounceRef.current)
     if (query.trim().length < 2) {
       setIssues([])
+      setTestCases([])
       return
     }
     debounceRef.current = setTimeout(async () => {
-      const { data } = await supabase
-        .from('issues')
-        .select('id, title, project_id, status')
-        .ilike('title', `%${query.trim()}%`)
-        .limit(8)
-      setIssues(data || [])
+      const q = query.trim()
+      const [{ data: issueRows }, { data: caseRows }] = await Promise.all([
+        supabase.from('issues').select('id, title, project_id, status').ilike('title', `%${q}%`).limit(8),
+        supabase.from('test_cases').select('id, human_id, title, project_id').ilike('title', `%${q}%`).limit(8),
+      ])
+      setIssues(issueRows || [])
+      setTestCases(caseRows || [])
     }, 180)
     return () => clearTimeout(debounceRef.current)
   }, [query, open])
@@ -86,6 +90,7 @@ export default function CommandPalette() {
   const flat = [
     ...filteredActions.map((a) => ({ kind: 'action', item: a })),
     ...filteredProjects.map((p) => ({ kind: 'project', item: p })),
+    ...testCases.map((c) => ({ kind: 'testcase', item: c })),
     ...issues.map((i) => ({ kind: 'issue', item: i })),
   ]
 
@@ -100,10 +105,13 @@ export default function CommandPalette() {
       if (entry.kind === 'action') navigate(entry.item.to)
       if (entry.kind === 'project') {
         recordRecentProject(entry.item.id)
-        navigate(`/project/${entry.item.id}`)
+        navigate(`/project/${entry.item.id}/overview`)
       }
       if (entry.kind === 'issue') {
         navigate(`/project/${entry.item.project_id}/issue/${entry.item.id}`)
+      }
+      if (entry.kind === 'testcase') {
+        navigate(`/project/${entry.item.project_id}/cases/${entry.item.id}`)
       }
     },
     [navigate]
@@ -193,6 +201,23 @@ export default function CommandPalette() {
                   <FolderKanban size={15} className="text-blue-400 flex-shrink-0" />,
                   p.name,
                   p.key
+                )
+              )}
+            </>
+          )}
+
+          {testCases.length > 0 && (
+            <>
+              <p className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
+                Test Cases
+              </p>
+              {testCases.map((c) =>
+                renderRow(
+                  'testcase',
+                  c,
+                  <ListChecks size={15} className="text-blue-400 flex-shrink-0" />,
+                  c.title,
+                  c.human_id
                 )
               )}
             </>

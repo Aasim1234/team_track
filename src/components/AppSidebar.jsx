@@ -3,7 +3,8 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Map, Target, Clock, Star, Boxes, Plus,
   PanelLeftClose, PanelLeftOpen, ChevronsUpDown, ChevronDown,
-  LogOut, Check,
+  LogOut, Check, ArrowLeft, Home, ListChecks, PlayCircle, Flag,
+  BarChart3, CheckSquare, KanbanSquare,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
@@ -34,6 +35,18 @@ const NAV_ITEMS = [
   { to: '/plans', label: 'Plans', icon: Map },
   { to: '/goals', label: 'Goals', icon: Target },
 ]
+
+function projectNavItems(projectId) {
+  const base = `/project/${projectId}`
+  return [
+    { to: `${base}/overview`, label: 'Overview', icon: Home },
+    { to: `${base}/cases`, label: 'Test Cases', icon: ListChecks },
+    { to: `${base}/runs`, label: 'Test Runs & Results', icon: PlayCircle },
+    { to: `${base}/milestones`, label: 'Milestones', icon: Flag },
+    { to: `${base}/reports`, label: 'Reports', icon: BarChart3 },
+    { to: `${base}/todo`, label: 'To-Do', icon: CheckSquare },
+  ]
+}
 
 function NavButton({ item, active, collapsed, onClick }) {
   const Icon = item.icon
@@ -160,6 +173,9 @@ export default function AppSidebar() {
     .map((rid) => projects.find((p) => p.id === rid))
     .filter(Boolean)
 
+  const inProjectContext = Boolean(currentProjectId) && pathname.startsWith('/project/')
+  const currentProject = projects.find((p) => p.id === currentProjectId)
+
   const displayName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'User'
   const initials = displayName
     .split(' ')
@@ -174,32 +190,63 @@ export default function AppSidebar() {
         collapsed ? 'w-[68px]' : 'w-[240px]'
       } flex-shrink-0 bg-gray-900/70 border-r border-gray-800 h-screen sticky top-0 flex flex-col transition-all duration-300`}
     >
-      {/* Header: logo + collapse toggle */}
-      <div className={`flex items-center gap-2 p-3 ${collapsed ? 'flex-col' : ''}`}>
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="flex items-center gap-2.5 flex-1 min-w-0"
-        >
-          <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-green-500 flex items-center justify-center text-[13px] font-extrabold text-white shadow-lg shadow-blue-500/20 flex-shrink-0">
-            TT
-          </span>
-          {!collapsed && (
-            <span className="font-bold text-white text-[15px] tracking-tight truncate">
-              Team Tracker
+      {/* Header: logo + collapse toggle, or project identity when inside a project workspace */}
+      {inProjectContext ? (
+        <div className="p-3">
+          <div className="flex items-center justify-between mb-2.5">
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="flex items-center gap-1.5 text-gray-400 hover:text-white text-xs font-medium"
+            >
+              <ArrowLeft size={13} />
+              {!collapsed && 'All Projects'}
+            </button>
+            <button
+              onClick={() => setCollapsed(!collapsed)}
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              className="text-gray-500 hover:text-white p-1 rounded-lg hover:bg-gray-800 flex-shrink-0"
+            >
+              {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+            </button>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <span className="w-8 h-8 rounded-lg bg-blue-500/15 text-blue-400 flex items-center justify-center text-[11px] font-bold flex-shrink-0">
+              {currentProject?.key?.slice(0, 2) || '··'}
             </span>
-          )}
-        </button>
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="text-gray-500 hover:text-white p-1.5 rounded-lg hover:bg-gray-800 flex-shrink-0"
-        >
-          {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-        </button>
-      </div>
+            {!collapsed && (
+              <span className="font-bold text-white text-[14px] tracking-tight truncate">
+                {currentProject?.name || 'Loading…'}
+              </span>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className={`flex items-center gap-2 p-3 ${collapsed ? 'flex-col' : ''}`}>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center gap-2.5 flex-1 min-w-0"
+          >
+            <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-green-500 flex items-center justify-center text-[13px] font-extrabold text-white shadow-lg shadow-blue-500/20 flex-shrink-0">
+              TT
+            </span>
+            {!collapsed && (
+              <span className="font-bold text-white text-[15px] tracking-tight truncate">
+                Team Tracker
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            className="text-gray-500 hover:text-white p-1.5 rounded-lg hover:bg-gray-800 flex-shrink-0"
+          >
+            {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+          </button>
+        </div>
+      )}
 
       {/* Workspace switcher */}
-      {!collapsed && (
+      {!collapsed && !inProjectContext && (
         <div className="px-3 pb-2 relative">
           <button
             onClick={() => setWsMenuOpen(!wsMenuOpen)}
@@ -232,6 +279,34 @@ export default function AppSidebar() {
 
       {/* Scrollable nav area */}
       <div className="flex-1 overflow-y-auto px-3 py-1 space-y-5">
+        {inProjectContext ? (
+          <>
+            <nav className="space-y-0.5">
+              {projectNavItems(currentProjectId).map((item) => (
+                <NavButton
+                  key={item.to}
+                  item={item}
+                  collapsed={collapsed}
+                  active={pathname.startsWith(item.to)}
+                  onClick={() => navigate(item.to)}
+                />
+              ))}
+            </nav>
+            <div className="pt-4 mt-1 border-t border-gray-800">
+              {!collapsed && (
+                <p className="pl-3 pb-1 text-[11px] text-gray-500 uppercase font-semibold tracking-wider">
+                  Classic
+                </p>
+              )}
+              <NavButton
+                item={{ to: `/project/${currentProjectId}/classic`, label: 'Kanban / Sprints', icon: KanbanSquare }}
+                collapsed={collapsed}
+                active={pathname.startsWith(`/project/${currentProjectId}/classic`)}
+                onClick={() => navigate(`/project/${currentProjectId}/classic`)}
+              />
+            </div>
+          </>
+        ) : (
         <nav className="space-y-0.5">
           {NAV_ITEMS.map((item) => (
             <NavButton
@@ -243,8 +318,9 @@ export default function AppSidebar() {
             />
           ))}
         </nav>
+        )}
 
-        {!collapsed && (
+        {!collapsed && !inProjectContext && (
           <>
             {/* Recent */}
             <div>
