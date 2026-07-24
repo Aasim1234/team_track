@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: team-tracker
+  labels:
+    app: team-tracker
+spec:
+  # On docker-desktop, LoadBalancer binds to localhost — app at http://localhost:8090
+  # On cloud clusters this provisions a real load balancer.
+  type: LoadBalancer
+  selector:
+    app: team-tracker
+  ports:
+    - name: http
+      port: 8090
+      targetPort: http

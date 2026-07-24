@@ -1,0 +1,22 @@
+# OPTIONAL — for clusters with an ingress controller (nginx-ingress, traefik, cloud LB).
+# Not needed on docker-desktop (the LoadBalancer service already exposes the app).
+# Update the host, then: kubectl apply -f k8s/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: team-tracker
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: tracker.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: team-tracker
+                port:
+                  name: http
