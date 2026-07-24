@@ -1,7 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import {
-  PlayCircle, Flag, BarChart3, CheckSquare, Sparkles, SlidersHorizontal, Plug, Database, Settings,
-} from 'lucide-react'
+import { Flag } from 'lucide-react'
 import { useAuth } from './hooks/useAuth'
 import { useProjectAdminAccess } from './hooks/useProjectAdminAccess'
 import Login from './pages/Login'
@@ -12,12 +10,19 @@ import PlansPage from './pages/PlansPage'
 import GoalsPage from './pages/GoalsPage'
 import ProjectOverviewPage from './pages/ProjectOverviewPage'
 import TestCasesPage from './pages/TestCasesPage'
+import TestRunsPage from './pages/TestRunsPage'
+import TodoPage from './pages/TodoPage'
+import ReportsPage from './pages/ReportsPage'
 import CommandPalette from './components/CommandPalette'
 import ComingSoonPage from './components/ComingSoonPage'
 import AdminOverviewPage from './pages/admin/AdminOverviewPage'
 import AdminProjectsPage from './pages/admin/AdminProjectsPage'
 import AdminUsersRolesPage from './pages/admin/AdminUsersRolesPage'
-import AdminPlaceholderPage from './pages/admin/AdminPlaceholderPage'
+import AdminAiHubPage from './pages/admin/AdminAiHubPage'
+import AdminCustomizationsPage from './pages/admin/AdminCustomizationsPage'
+import AdminIntegrationPage from './pages/admin/AdminIntegrationPage'
+import AdminDataManagementPage from './pages/admin/AdminDataManagementPage'
+import AdminSiteSettingsPage from './pages/admin/AdminSiteSettingsPage'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -109,7 +114,7 @@ function App() {
           path="/admin/ai-hub"
           element={
             <AdminRoute>
-              <AdminPlaceholderPage title="AI Hub" icon={Sparkles} description="AI-assisted test generation and suggestions will live here." />
+              <AdminAiHubPage />
             </AdminRoute>
           }
         />
@@ -117,7 +122,7 @@ function App() {
           path="/admin/customizations"
           element={
             <AdminRoute>
-              <AdminPlaceholderPage title="Customizations" icon={SlidersHorizontal} description="Custom fields, statuses, and templates will be configurable here." />
+              <AdminCustomizationsPage />
             </AdminRoute>
           }
         />
@@ -125,7 +130,7 @@ function App() {
           path="/admin/integration"
           element={
             <AdminRoute>
-              <AdminPlaceholderPage title="Integration" icon={Plug} description="Jira, GitHub, GitLab, and CI/CD integrations will be configurable here." />
+              <AdminIntegrationPage />
             </AdminRoute>
           }
         />
@@ -133,7 +138,7 @@ function App() {
           path="/admin/data-management"
           element={
             <AdminRoute>
-              <AdminPlaceholderPage title="Data Management" icon={Database} description="Storage usage, exports, and attachment management will live here." />
+              <AdminDataManagementPage />
             </AdminRoute>
           }
         />
@@ -141,7 +146,7 @@ function App() {
           path="/admin/site-settings"
           element={
             <AdminRoute>
-              <AdminPlaceholderPage title="Site Settings" icon={Settings} description="General, security, authentication, and email settings will live here." />
+              <AdminSiteSettingsPage />
             </AdminRoute>
           }
         />
@@ -177,12 +182,15 @@ function App() {
           path="/project/:id/runs"
           element={
             <ProtectedRoute>
-              <ComingSoonPage
-                title="Test Runs & Results"
-                description="Create test runs, select cases, execute them, and preserve full pass/fail history across runs."
-                icon={PlayCircle}
-                phase="Phase 2"
-              />
+              <TestRunsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/project/:id/runs/:runId"
+          element={
+            <ProtectedRoute>
+              <TestRunsPage />
             </ProtectedRoute>
           }
         />
@@ -203,12 +211,7 @@ function App() {
           path="/project/:id/reports"
           element={
             <ProtectedRoute>
-              <ComingSoonPage
-                title="Reports"
-                description="Generate coverage, activity, and results reports from real execution data."
-                icon={BarChart3}
-                phase="Phase 5"
-              />
+              <ReportsPage />
             </ProtectedRoute>
           }
         />
@@ -216,12 +219,7 @@ function App() {
           path="/project/:id/todo"
           element={
             <ProtectedRoute>
-              <ComingSoonPage
-                title="To-Do"
-                description="See exactly which test runs and cases are assigned to you across this project."
-                icon={CheckSquare}
-                phase="Phase 3"
-              />
+              <TodoPage />
             </ProtectedRoute>
           }
         />

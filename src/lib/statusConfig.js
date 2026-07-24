@@ -66,6 +66,11 @@ export const PROJECT_MEMBER_ROLE = {
   viewer: { label: 'Viewer', color: 'gray' },
 }
 
+export const RUN_STATUS = {
+  active: { label: 'Active', color: 'blue' },
+  closed: { label: 'Closed', color: 'gray' },
+}
+
 export const GOAL_STATUS = {
   on_track: { label: 'On Track', color: 'green' },
   at_risk: { label: 'At Risk', color: 'orange' },

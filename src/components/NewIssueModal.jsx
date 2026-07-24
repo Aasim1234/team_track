@@ -1,23 +1,13 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { renderMarkdown } from './CommentComposer'
 import { uploadAttachment } from '../lib/attachments'
+import { COLOR_MAP } from '../lib/statusConfig'
 
 const ISSUE_TYPES = [
   { value: 'bug', label: 'Bug', desc: 'An unexpected problem or behavior', color: 'text-red-400', icon: '●' },
   { value: 'story', label: 'Feature', desc: 'A request, idea, or new functionality', color: 'text-blue-400', icon: '●' },
   { value: 'task', label: 'Task', desc: 'A specific piece of work', color: 'text-yellow-400', icon: '●' },
-]
-
-const LABEL_OPTIONS = [
-  { name: 'bug', color: 'bg-red-500' },
-  { name: 'enhancement', color: 'bg-teal-500' },
-  { name: 'documentation', color: 'bg-blue-500' },
-  { name: 'urgent', color: 'bg-orange-500' },
-  { name: 'blocked', color: 'bg-purple-500' },
-  { name: 'good first issue', color: 'bg-green-500' },
-  { name: 'needs review', color: 'bg-pink-500' },
-  { name: 'wontfix', color: 'bg-gray-500' },
 ]
 
 function getAvatarColor(name) {
@@ -40,6 +30,15 @@ export default function NewIssueModal({ projectId, sprintId, reporterId, members
   const [selectedLabels, setSelectedLabels] = useState([])
   const [dueDate, setDueDate] = useState('')
   const [pendingFiles, setPendingFiles] = useState([]) // { file, previewUrl, kind }
+  const [labelOptions, setLabelOptions] = useState([])
+
+  useEffect(() => {
+    supabase
+      .from('label_definitions')
+      .select('name, color')
+      .order('name')
+      .then(({ data }) => setLabelOptions(data || []))
+  }, [])
 
   const [showAssigneePicker, setShowAssigneePicker] = useState(false)
   const [showLabelPicker, setShowLabelPicker] = useState(false)
@@ -53,7 +52,7 @@ export default function NewIssueModal({ projectId, sprintId, reporterId, members
   const filteredMembers = members.filter((m) =>
     m.name.toLowerCase().includes(assigneeSearch.toLowerCase())
   )
-  const filteredLabels = LABEL_OPTIONS.filter((l) =>
+  const filteredLabels = labelOptions.filter((l) =>
     l.name.toLowerCase().includes(labelSearch.toLowerCase())
   )
 
@@ -309,7 +308,7 @@ export default function NewIssueModal({ projectId, sprintId, reporterId, members
                           onChange={() => toggleLabel(l.name)}
                           className="accent-green-500"
                         />
-                        <span className={`w-2.5 h-2.5 rounded-full ${l.color}`}></span>
+                        <span className={`w-2.5 h-2.5 rounded-full ${COLOR_MAP[l.color]?.dot || COLOR_MAP.gray.dot}`}></span>
                         {l.name}
                       </label>
                     ))}
@@ -358,11 +357,12 @@ export default function NewIssueModal({ projectId, sprintId, reporterId, members
           {selectedLabels.length > 0 && (
             <div className="flex flex-wrap gap-1 mb-4">
               {selectedLabels.map((name) => {
-                const l = LABEL_OPTIONS.find((opt) => opt.name === name)
+                const l = labelOptions.find((opt) => opt.name === name)
+                const barClass = COLOR_MAP[l?.color]?.bar || COLOR_MAP.gray.bar
                 return (
                   <span
                     key={name}
-                    className={`text-xs px-2 py-0.5 rounded-full text-white flex items-center gap-1 ${l?.color || 'bg-gray-500'}`}
+                    className={`text-xs px-2 py-0.5 rounded-full text-white flex items-center gap-1 ${barClass}`}
                   >
                     {name}
                     <button type="button" onClick={() => toggleLabel(name)} className="hover:opacity-70">×</button>
