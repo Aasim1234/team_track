@@ -36,7 +36,7 @@ export default function AdminSidebar() {
         </button>
         <div className="flex items-center gap-2">
           <span className="w-6 h-6 rounded bg-blue-500 flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0">
-            TT
+            TF
           </span>
           <span className="font-semibold text-white text-[13px]">Administration</span>
         </div>

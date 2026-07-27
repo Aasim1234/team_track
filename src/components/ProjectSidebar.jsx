@@ -184,9 +184,9 @@ export default function ProjectSidebar() {
         <div className="flex items-center justify-between px-2.5 py-2 border-b border-gray-600">
           <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 min-w-0">
             <span className="w-6 h-6 rounded bg-blue-500 flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0">
-              TT
+              TF
             </span>
-            {!collapsed && <span className="font-semibold text-white text-[13px] truncate">Team Tracker</span>}
+            {!collapsed && <span className="font-semibold text-white text-[13px] truncate">TestForge</span>}
           </button>
           <button
             onClick={() => setCollapsed(!collapsed)}

@@ -56,7 +56,7 @@ export default function AdminSiteSettingsPage() {
           <div>
             <p className="text-[12px] font-semibold text-gray-300 mb-2">General</p>
             <div className="border border-gray-600 rounded-lg">
-              <Row label="Site name" value="Team Tracker" />
+              <Row label="Site name" value="TestForge" />
               <Row label="Date format" value="MM/DD/YYYY" />
               <Row label="Timezone" value={Intl.DateTimeFormat().resolvedOptions().timeZone} />
             </div>

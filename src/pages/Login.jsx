@@ -225,9 +225,9 @@ export default function Login() {
           {/* Logo */}
           <div className="flex flex-col items-center mb-6">
             <span className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-green-500 flex items-center justify-center text-sm font-extrabold text-white shadow-lg shadow-blue-500/25 mb-4">
-              TT
+              TF
             </span>
-            <h1 className="text-[26px] font-bold text-white tracking-tight">Team Tracker</h1>
+            <h1 className="text-[26px] font-bold text-white tracking-tight">TestForge</h1>
             <p className="text-gray-400 text-sm mt-1">
               {isSignUp ? 'Start tracking work with your team' : 'Sign in to your workspace'}
             </p>
@@ -416,7 +416,7 @@ export default function Login() {
         </div>
 
         <p className="text-center text-[11px] text-gray-500 mt-5">
-          Secured by Supabase Auth · Team Tracker
+          Secured by Supabase Auth · TestForge
         </p>
       </div>
     </div>

@@ -52,7 +52,7 @@ export default function AppHeader({ breadcrumb = [], onQuickCreate, quickCreateL
       <div className="flex-1 flex items-center gap-2.5 min-w-0">
         <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 flex-shrink-0">
           <span className="w-6 h-6 rounded bg-blue-500 flex items-center justify-center text-[11px] font-bold text-white">
-            TT
+            TF
           </span>
         </button>
         <span className="text-gray-300 flex-shrink-0">/</span>
