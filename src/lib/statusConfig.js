@@ -71,6 +71,12 @@ export const RUN_STATUS = {
   closed: { label: 'Closed', color: 'gray' },
 }
 
+export const MEMBER_STATUS = {
+  working: { label: 'Working', color: 'green' },
+  idle: { label: 'Idle', color: 'orange' },
+  offline: { label: 'Offline', color: 'gray' },
+}
+
 export const GOAL_STATUS = {
   on_track: { label: 'On Track', color: 'green' },
   at_risk: { label: 'At Risk', color: 'orange' },

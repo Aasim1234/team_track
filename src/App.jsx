@@ -18,6 +18,7 @@ import ComingSoonPage from './components/ComingSoonPage'
 import AdminOverviewPage from './pages/admin/AdminOverviewPage'
 import AdminProjectsPage from './pages/admin/AdminProjectsPage'
 import AdminUsersRolesPage from './pages/admin/AdminUsersRolesPage'
+import AdminTeamPerformancePage from './pages/admin/AdminTeamPerformancePage'
 import AdminAiHubPage from './pages/admin/AdminAiHubPage'
 import AdminCustomizationsPage from './pages/admin/AdminCustomizationsPage'
 import AdminIntegrationPage from './pages/admin/AdminIntegrationPage'
@@ -107,6 +108,14 @@ function App() {
           element={
             <AdminRoute>
               <AdminUsersRolesPage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/team-performance"
+          element={
+            <AdminRoute>
+              <AdminTeamPerformancePage />
             </AdminRoute>
           }
         />

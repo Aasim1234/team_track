@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   ArrowLeft, LayoutDashboard, FolderKanban, Users, Sparkles,
-  SlidersHorizontal, Plug, Database, Settings, LogOut,
+  SlidersHorizontal, Plug, Database, Settings, LogOut, Gauge,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { to: '/admin', label: 'Overview', icon: LayoutDashboard, exact: true },
   { to: '/admin/projects', label: 'Projects', icon: FolderKanban },
   { to: '/admin/users', label: 'Users & Roles', icon: Users },
+  { to: '/admin/team-performance', label: 'Team Performance', icon: Gauge },
   { to: '/admin/ai-hub', label: 'AI Hub', icon: Sparkles },
   { to: '/admin/customizations', label: 'Customizations', icon: SlidersHorizontal },
   { to: '/admin/integration', label: 'Integration', icon: Plug },
