@@ -71,10 +71,10 @@ export default function EnterpriseTable({
 
       <div className="border border-gray-600 rounded-lg overflow-x-auto">
         <table className="w-full text-[13px]">
-          <thead className="sticky top-12 z-10 bg-gray-700">
+          <thead>
             <tr>
               {selectable && (
-                <th className="w-9 px-3 py-2">
+                <th className="bg-gray-700 w-9 px-3 py-2">
                   <input type="checkbox" checked={allSelected} onChange={toggleAll} className="accent-blue-500" />
                 </th>
               )}
@@ -83,7 +83,7 @@ export default function EnterpriseTable({
                   key={col.key}
                   style={col.width ? { width: col.width } : undefined}
                   onClick={() => handleSort(col)}
-                  className={`text-left px-3 py-2 text-[11px] font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap ${
+                  className={`bg-gray-700 text-left px-3 py-2 text-[11px] font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap ${
                     col.sortable ? 'cursor-pointer select-none hover:text-gray-300' : ''
                   }`}
                 >
