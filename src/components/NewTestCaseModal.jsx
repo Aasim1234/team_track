@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
+import { useToast } from './ui/Toast'
 
 const TEST_TYPES = [
   'functional', 'regression', 'smoke', 'sanity', 'integration', 'system',
@@ -14,6 +15,7 @@ function label(value) {
 }
 
 export default function NewTestCaseModal({ sections, defaultSectionId, members, onClose, onCreated }) {
+  const toast = useToast()
   const [sectionId, setSectionId] = useState(defaultSectionId || sections[0]?.id || '')
   const [title, setTitle] = useState('')
   const [preconditions, setPreconditions] = useState('')
@@ -28,7 +30,7 @@ export default function NewTestCaseModal({ sections, defaultSectionId, members, 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!sectionId) {
-      alert('Create a section first, then add test cases to it.')
+      toast.error('Create a section first, then add test cases to it.')
       return
     }
     setSaving(true)
@@ -46,7 +48,7 @@ export default function NewTestCaseModal({ sections, defaultSectionId, members, 
     })
     setSaving(false)
     if (error) {
-      alert(error.message)
+      toast.error(error.message)
       return
     }
     onCreated()

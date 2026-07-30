@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { useToast } from './ui/Toast'
 
 function daysBetween(a, b) {
   return Math.ceil((new Date(b) - new Date(a)) / (1000 * 60 * 60 * 24))
 }
 
 export default function SprintBar({ projectId, activeSprintId, onSprintChange }) {
+  const toast = useToast()
   const [sprints, setSprints] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
@@ -59,7 +61,7 @@ export default function SprintBar({ projectId, activeSprintId, onSprintChange })
       setShowForm(false)
       fetchSprints()
     } else {
-      alert(error.message)
+      toast.error(error.message)
     }
   }
 

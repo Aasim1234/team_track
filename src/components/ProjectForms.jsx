@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
+import { useToast } from './ui/Toast'
 
 const FORM_TYPES = [
   { value: 'bug', label: '🐞 Bug report', blurb: 'Something is broken or not working as expected' },
@@ -10,6 +11,7 @@ const FORM_TYPES = [
 
 export default function ProjectForms({ projectId, onCreated }) {
   const { user } = useAuth()
+  const toast = useToast()
   const [formType, setFormType] = useState(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -38,7 +40,7 @@ export default function ProjectForms({ projectId, onCreated }) {
     })
     setSaving(false)
     if (error) {
-      alert(error.message)
+      toast.error(error.message)
       return
     }
     setSubmitted(true)

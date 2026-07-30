@@ -6,8 +6,6 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ProjectBoard from './pages/ProjectBoard'
 import IssueDetailPage from './pages/IssueDetailPage'
-import PlansPage from './pages/PlansPage'
-import GoalsPage from './pages/GoalsPage'
 import ProjectOverviewPage from './pages/ProjectOverviewPage'
 import TestCasesPage from './pages/TestCasesPage'
 import TestRunsPage from './pages/TestRunsPage'
@@ -15,6 +13,7 @@ import TodoPage from './pages/TodoPage'
 import ReportsPage from './pages/ReportsPage'
 import CommandPalette from './components/CommandPalette'
 import ComingSoonPage from './components/ComingSoonPage'
+import { ToastProvider } from './components/ui/Toast'
 import AdminOverviewPage from './pages/admin/AdminOverviewPage'
 import AdminProjectsPage from './pages/admin/AdminProjectsPage'
 import AdminUsersRolesPage from './pages/admin/AdminUsersRolesPage'
@@ -52,6 +51,7 @@ function PublicRoute({ children }) {
 
 function App() {
   return (
+    <ToastProvider>
     <BrowserRouter>
       <CommandPalette />
       <Routes>
@@ -68,22 +68,6 @@ function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/plans"
-          element={
-            <ProtectedRoute>
-              <PlansPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/goals"
-          element={
-            <ProtectedRoute>
-              <GoalsPage />
             </ProtectedRoute>
           }
         />
@@ -251,6 +235,7 @@ function App() {
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </BrowserRouter>
+    </ToastProvider>
   )
 }
 

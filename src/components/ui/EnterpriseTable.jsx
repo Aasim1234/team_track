@@ -71,7 +71,7 @@ export default function EnterpriseTable({
 
       <div className="border border-gray-600 rounded-lg overflow-x-auto">
         <table className="w-full text-[13px]">
-          <thead className="sticky top-0 bg-gray-700">
+          <thead className="sticky top-12 z-10 bg-gray-700">
             <tr>
               {selectable && (
                 <th className="w-9 px-3 py-2">

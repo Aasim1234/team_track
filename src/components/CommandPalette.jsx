@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Search, LayoutDashboard, Map, Target, Plus, FolderKanban, CircleDot, CornerDownLeft, ListChecks,
+  Search, LayoutDashboard, Plus, FolderKanban, CircleDot, CornerDownLeft, ListChecks,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
@@ -9,8 +9,6 @@ import { recordRecentProject } from '../lib/recentProjects'
 
 const ACTIONS = [
   { id: 'nav-dashboard', label: 'Go to Dashboard', icon: LayoutDashboard, to: '/dashboard' },
-  { id: 'nav-plans', label: 'Go to Plans', icon: Map, to: '/plans' },
-  { id: 'nav-goals', label: 'Go to Goals', icon: Target, to: '/goals' },
   { id: 'new-project', label: 'Create new project', icon: Plus, to: '/dashboard?new=1' },
 ]
 

@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth'
 import ActivityFeed from '../components/ActivityFeed'
 import CommentComposer, { renderMarkdown } from '../components/CommentComposer'
 import { uploadAttachment, deleteAttachment } from '../lib/attachments'
+import { useToast } from '../components/ui/Toast'
 
 const AVATAR_COLORS = ['bg-pink-500', 'bg-purple-500', 'bg-blue-500', 'bg-teal-500', 'bg-orange-500', 'bg-red-500']
 
@@ -33,6 +34,7 @@ export default function IssueDetailPage() {
   const { id: projectId, issueId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const toast = useToast()
 
   const [project, setProject] = useState(null)
   const [issue, setIssue] = useState(null)
@@ -95,7 +97,7 @@ export default function IssueDetailPage() {
       try {
         await uploadAttachment(file, issueId, user.id)
       } catch (err) {
-        alert(`Failed to upload ${file.name}: ${err.message}`)
+        toast.error(`Failed to upload ${file.name}: ${err.message}`)
       }
     }
     setUploadingFile(false)
@@ -151,7 +153,14 @@ export default function IssueDetailPage() {
   }
 
   if (loading || !issue || !project) {
-    return <div className="min-h-screen bg-gray-900 text-white p-8">Loading...</div>
+    return (
+      <div className="min-h-screen bg-gray-900 text-white p-8 animate-pulse">
+        <div className="h-4 w-40 bg-gray-800 rounded-md mb-6" />
+        <div className="h-8 w-2/3 bg-gray-800 rounded-lg mb-4" />
+        <div className="h-24 bg-gray-800 rounded-lg mb-4" />
+        <div className="h-4 w-1/3 bg-gray-800 rounded-md" />
+      </div>
+    )
   }
 
   const reporter = members.find((m) => m.id === issue.reporter_id)

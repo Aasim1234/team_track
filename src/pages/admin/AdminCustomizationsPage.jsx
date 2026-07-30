@@ -9,10 +9,12 @@ import EnterpriseTable from '../../components/ui/EnterpriseTable'
 import EmptyState from '../../components/ui/EmptyState'
 import Modal from '../../components/ui/Modal'
 import FormField, { inputClass } from '../../components/ui/FormField'
+import { useToast } from '../../components/ui/Toast'
 
 const COLOR_OPTIONS = Object.keys(COLOR_MAP)
 
 export default function AdminCustomizationsPage() {
+  const toast = useToast()
   const [labels, setLabels] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
@@ -50,7 +52,7 @@ export default function AdminCustomizationsPage() {
     const { error } = await supabase.from('label_definitions').insert({ name: name.trim(), color })
     setSaving(false)
     if (error) {
-      alert(error.message)
+      toast.error(error.message)
       return
     }
     setShowCreate(false)
@@ -66,7 +68,7 @@ export default function AdminCustomizationsPage() {
       .eq('id', editing.id)
     setSaving(false)
     if (error) {
-      alert(error.message)
+      toast.error(error.message)
       return
     }
     setEditing(null)

@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
+import { useToast } from './ui/Toast'
 
 export default function ProjectCode({ projectId }) {
   const { user } = useAuth()
+  const toast = useToast()
   const [repos, setRepos] = useState([])
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
@@ -26,7 +28,7 @@ export default function ProjectCode({ projectId }) {
     e.preventDefault()
     const cleanUrl = url.trim()
     if (!/^https?:\/\//i.test(cleanUrl)) {
-      alert('URL must start with http:// or https://')
+      toast.error('URL must start with http:// or https://')
       return
     }
     const { error } = await supabase.from('project_repos').insert({
@@ -36,7 +38,7 @@ export default function ProjectCode({ projectId }) {
       created_by: user.id,
     })
     if (error) {
-      alert(error.message)
+      toast.error(error.message)
       return
     }
     setName('')

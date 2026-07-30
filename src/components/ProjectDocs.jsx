@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
+import { useToast } from './ui/Toast'
 
 export default function ProjectDocs({ projectId }) {
   const { user } = useAuth()
+  const toast = useToast()
   const [docs, setDocs] = useState([])
   const [selectedId, setSelectedId] = useState(null)
   const [title, setTitle] = useState('')
@@ -41,7 +43,7 @@ export default function ProjectDocs({ projectId }) {
       .select()
       .single()
     if (error) {
-      alert(error.message)
+      toast.error(error.message)
       return
     }
     await fetchDocs()
@@ -59,7 +61,7 @@ export default function ProjectDocs({ projectId }) {
       .eq('id', selectedId)
     setSaving(false)
     if (error) {
-      alert(error.message)
+      toast.error(error.message)
       return
     }
     setDirty(false)

@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient'
 import { renderMarkdown } from './CommentComposer'
 import { uploadAttachment } from '../lib/attachments'
 import { COLOR_MAP } from '../lib/statusConfig'
+import { useToast } from './ui/Toast'
 
 const ISSUE_TYPES = [
   { value: 'bug', label: 'Bug', desc: 'An unexpected problem or behavior', color: 'text-red-400', icon: '●' },
@@ -22,6 +23,7 @@ function getInitials(name) {
 }
 
 export default function NewIssueModal({ projectId, sprintId, reporterId, members, onClose, onCreated }) {
+  const toast = useToast()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [descTab, setDescTab] = useState('write') // 'write' | 'preview'
@@ -100,7 +102,7 @@ export default function NewIssueModal({ projectId, sprintId, reporterId, members
 
     if (error) {
       setSaving(false)
-      alert(error.message)
+      toast.error(error.message)
       return
     }
 

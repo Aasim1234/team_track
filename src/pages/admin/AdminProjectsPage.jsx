@@ -9,9 +9,11 @@ import PageHeader from '../../components/PageHeader'
 import EnterpriseTable from '../../components/ui/EnterpriseTable'
 import Modal from '../../components/ui/Modal'
 import FormField, { inputClass } from '../../components/ui/FormField'
+import { useToast } from '../../components/ui/Toast'
 
 export default function AdminProjectsPage() {
   const { user } = useAuth()
+  const toast = useToast()
   const navigate = useNavigate()
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
@@ -45,7 +47,7 @@ export default function AdminProjectsPage() {
     const { error } = await supabase.from('projects').insert({ name, key: key.toUpperCase(), created_by: user.id })
     setSaving(false)
     if (error) {
-      alert(error.message)
+      toast.error(error.message)
       return
     }
     setName('')
@@ -63,7 +65,7 @@ export default function AdminProjectsPage() {
       .eq('id', editing.id)
     setSaving(false)
     if (error) {
-      alert(error.message)
+      toast.error(error.message)
       return
     }
     setEditing(null)

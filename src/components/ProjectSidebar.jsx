@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import {
-  LayoutDashboard, Map, Target, Clock, Star, Boxes, Plus,
+  LayoutDashboard, Clock, Star, Boxes, Plus,
   PanelLeftClose, PanelLeftOpen, ChevronDown,
   LogOut, ArrowLeft, Home, ListChecks, PlayCircle, Flag,
   BarChart3, CheckSquare, KanbanSquare,
@@ -16,8 +16,6 @@ const COLLAPSED_KEY = 'tt_sidebar_collapsed'
 
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/plans', label: 'Plans', icon: Map },
-  { to: '/goals', label: 'Goals', icon: Target },
 ]
 
 function projectNavItems(projectId) {

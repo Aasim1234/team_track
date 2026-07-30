@@ -3,8 +3,10 @@ import { Search } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import Modal from './ui/Modal'
 import FormField, { inputClass } from './ui/FormField'
+import { useToast } from './ui/Toast'
 
 export default function NewTestRunModal({ open, onClose, projectId, cases, members, onCreated }) {
+  const toast = useToast()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [search, setSearch] = useState('')
@@ -41,7 +43,7 @@ export default function NewTestRunModal({ open, onClose, projectId, cases, membe
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (checked.size === 0) {
-      alert('Select at least one test case to include in this run.')
+      toast.error('Select at least one test case to include in this run.')
       return
     }
     setSaving(true)
@@ -52,7 +54,7 @@ export default function NewTestRunModal({ open, onClose, projectId, cases, membe
       .single()
     if (error) {
       setSaving(false)
-      alert(error.message)
+      toast.error(error.message)
       return
     }
     const rows = [...checked].map((testCaseId) => ({
@@ -63,7 +65,7 @@ export default function NewTestRunModal({ open, onClose, projectId, cases, membe
     const { error: caseError } = await supabase.from('test_run_cases').insert(rows)
     setSaving(false)
     if (caseError) {
-      alert(caseError.message)
+      toast.error(caseError.message)
       return
     }
     onCreated(run.id)

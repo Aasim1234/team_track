@@ -13,6 +13,7 @@ import NewIssueModal from '../components/NewIssueModal'
 import IssueListView from '../components/IssueListView'
 import ProjectSidebar from '../components/ProjectSidebar'
 import { recordRecentProject } from '../lib/recentProjects'
+import { useToast } from '../components/ui/Toast'
 import ProjectSummary from '../components/ProjectSummary'
 import ProjectCode from '../components/ProjectCode'
 import ProjectForms from '../components/ProjectForms'
@@ -75,7 +76,7 @@ function IssueCard({ issue, onClick, onDelete, members, projectKey }) {
       {...listeners}
       {...attributes}
       onClick={() => onClick(issue)}
-      className="group relative bg-gray-700/80 border border-gray-600/40 hover:border-gray-500/60 rounded-xl p-3 mb-2 cursor-pointer touch-none card-lift"
+      className="group relative bg-gray-700/80 border border-gray-600/40 hover:border-gray-500/60 rounded-lg p-3 mb-2 cursor-pointer touch-none"
     >
       <div className="flex justify-between items-start gap-1.5">
         <GripVertical
@@ -240,6 +241,7 @@ export default function ProjectBoard() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const toast = useToast()
   const [project, setProject] = useState(null)
   const [issues, setIssues] = useState([])
   const [members, setMembers] = useState([])
@@ -400,7 +402,7 @@ export default function ProjectBoard() {
       />
 
       {/* Project header */}
-      <div className="px-6 pt-5 pb-4 animate-slide-up">
+      <div className="px-6 pt-5 pb-4">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-bold tracking-tight">{project.name}</h1>
           <span className="text-[11px] font-bold bg-blue-500/15 text-blue-400 px-2 py-1 rounded-md tracking-wide">
@@ -429,7 +431,7 @@ export default function ProjectBoard() {
             <button
               onClick={() => {
                 navigator.clipboard.writeText(window.location.href)
-                alert('Project link copied — share it to invite your team.')
+                toast.success('Project link copied — share it to invite your team.')
               }}
               className="flex items-center gap-1.5 text-[13px] text-gray-300 bg-gray-800/80 border border-gray-600/40 hover:border-gray-500/60 px-3 py-1.5 rounded-lg"
             >

@@ -10,21 +10,9 @@ import AppHeader from '../components/AppHeader'
 import NewTestCaseModal from '../components/NewTestCaseModal'
 import TestCaseStepsEditor from '../components/TestCaseStepsEditor'
 import CommentComposer from '../components/CommentComposer'
-
-const PRIORITY_CHIP = {
-  critical: 'bg-red-500/15 text-red-400',
-  high: 'bg-orange-500/15 text-orange-400',
-  medium: 'bg-blue-500/15 text-blue-400',
-  low: 'bg-gray-500/15 text-gray-400',
-}
-
-const AUTOMATION_CHIP = {
-  automated: 'bg-green-500/15 text-green-400',
-  in_progress: 'bg-blue-500/15 text-blue-400',
-  planned: 'bg-orange-500/15 text-orange-400',
-  not_automated: 'bg-gray-500/15 text-gray-400',
-  not_applicable: 'bg-gray-500/15 text-gray-500',
-}
+import StatusBadge from '../components/ui/StatusBadge'
+import { useToast } from '../components/ui/Toast'
+import { TEST_CASE_PRIORITY, AUTOMATION_STATUS } from '../lib/statusConfig'
 
 function humanize(value) {
   if (!value) return ''
@@ -119,6 +107,7 @@ export default function TestCasesPage() {
   const { id: projectId, caseId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const toast = useToast()
 
   const [project, setProject] = useState(null)
   const [suites, setSuites] = useState([])
@@ -185,7 +174,7 @@ export default function TestCasesPage() {
     e.preventDefault()
     if (!newSuiteName.trim()) return
     const { error } = await supabase.from('test_suites').insert({ project_id: projectId, name: newSuiteName.trim() })
-    if (error) { alert(error.message); return }
+    if (error) { toast.error(error.message); return }
     setNewSuiteName('')
     setShowNewSuite(false)
     fetchAll()
@@ -199,7 +188,7 @@ export default function TestCasesPage() {
       parent_section_id: newSectionFor.parentSectionId,
       name: newSectionName.trim(),
     })
-    if (error) { alert(error.message); return }
+    if (error) { toast.error(error.message); return }
     setNewSectionName('')
     setNewSectionFor(null)
     fetchAll()
@@ -231,8 +220,8 @@ export default function TestCasesPage() {
         <div className="flex-1 min-w-0 p-6 animate-pulse">
           <div className="h-8 w-64 bg-gray-800 rounded-lg mb-4" />
           <div className="flex gap-4">
-            <div className="w-64 h-96 bg-gray-800 rounded-xl" />
-            <div className="flex-1 h-96 bg-gray-800/60 rounded-xl" />
+            <div className="w-64 h-96 bg-gray-800 rounded-lg" />
+            <div className="flex-1 h-96 bg-gray-800/60 rounded-lg" />
           </div>
         </div>
       </div>
@@ -396,19 +385,15 @@ export default function TestCasesPage() {
                 <button
                   key={c.id}
                   onClick={() => navigate(`/project/${projectId}/cases/${c.id}`)}
-                  className="w-full text-left bg-gray-800/80 border border-gray-600/30 hover:border-gray-500/50 rounded-lg px-4 py-2.5 flex items-center gap-3 card-lift"
+                  className="w-full text-left bg-gray-800 border border-gray-600 hover:bg-gray-650 rounded-lg px-4 py-2.5 flex items-center gap-3"
                 >
-                  <span className="text-[11px] font-mono text-blue-400 w-10 flex-shrink-0">{c.human_id}</span>
+                  <span className="text-[11px] font-mono text-blue-500 w-10 flex-shrink-0">{c.human_id}</span>
                   <span className="text-sm flex-1 truncate">{c.title}</span>
                   <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-gray-700 text-gray-300 capitalize flex-shrink-0">
                     {humanize(c.test_type)}
                   </span>
-                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md capitalize flex-shrink-0 ${PRIORITY_CHIP[c.priority]}`}>
-                    {c.priority}
-                  </span>
-                  <span className={`text-[10px] px-1.5 py-0.5 rounded-md capitalize flex-shrink-0 ${AUTOMATION_CHIP[c.automation_status]}`}>
-                    {humanize(c.automation_status)}
-                  </span>
+                  <StatusBadge domain={TEST_CASE_PRIORITY} value={c.priority} size="sm" />
+                  <StatusBadge domain={AUTOMATION_STATUS} value={c.automation_status} size="sm" />
                 </button>
               ))}
               {filteredCases.length === 0 && (
@@ -611,7 +596,7 @@ function TestCaseDetail({ projectId, caseId, project, sectionsWithPath, members,
 
             {/* Fields sidebar */}
             <div className="space-y-4">
-              <div className="bg-gray-800/70 rounded-xl p-4 space-y-3.5">
+              <div className="bg-gray-800/70 rounded-lg p-4 space-y-3.5">
                 <FieldSelect label="Type" value={testCase.test_type} canEdit={canAuthor}
                   options={['functional', 'regression', 'smoke', 'sanity', 'integration', 'system', 'ui', 'api', 'performance', 'security', 'compatibility', 'uat', 'exploratory']}
                   onChange={(v) => updateField('test_type', v)} />

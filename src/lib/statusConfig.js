@@ -59,6 +59,13 @@ export const ISSUE_STATUS = {
   done: { label: 'Done', color: 'green' },
 }
 
+export const ISSUE_PRIORITY = {
+  urgent: { label: 'Urgent', color: 'red' },
+  high: { label: 'High', color: 'orange' },
+  medium: { label: 'Medium', color: 'blue' },
+  low: { label: 'Low', color: 'gray' },
+}
+
 export const PROJECT_MEMBER_ROLE = {
   admin: { label: 'Admin', color: 'red' },
   lead: { label: 'Lead', color: 'orange' },
