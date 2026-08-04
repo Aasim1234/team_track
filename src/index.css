@@ -16,6 +16,7 @@
   --color-gray-900: #F4F6F8; /* app background */
   --color-gray-800: #FFFFFF; /* surface (header, sidebar, panels) */
   --color-gray-700: #F8FAFC; /* card / input background */
+  --color-gray-750: #EEF2F6; /* hairline divider/track — subtler than the border color */
   --color-gray-650: #F1F5F9; /* hover background */
   --color-gray-600: #E2E8F0; /* border */
   --color-gray-500: #64748B; /* tertiary text */
@@ -34,10 +35,22 @@
   --color-red-500: #EF4444;
   --color-red-400: #DC2626;
 
-  /* Compact radius system — 4/6/8px only, never larger */
+  /* Two-tier radius system:
+     - Controls (buttons/inputs/badges/dropdown items) stay on the
+       original compact scale — rounded/rounded-md/rounded-lg (4/6/8px),
+       never larger. This is unchanged and still enforced for controls.
+     - Large surfaces (bento cards, modals, side panels, command palette)
+       use these newer, bigger tokens instead — sanctioned, not a violation. */
+  --radius-2xl: 1.25rem; /* 20px — bento/stat cards, modals, side panels */
+  --radius-3xl: 1.75rem; /* 28px — rare, hero-style panels only */
+
   --shadow-xs: 0 1px 2px 0 rgb(15 23 42 / 0.04);
   --shadow-sm: 0 1px 3px 0 rgb(15 23 42 / 0.08), 0 1px 2px -1px rgb(15 23 42 / 0.06);
   --shadow-md: 0 4px 12px -2px rgb(15 23 42 / 0.10), 0 2px 4px -2px rgb(15 23 42 / 0.06);
+  /* Elevation for the premium surface tier — bento cards, floating panels */
+  --shadow-lg: 0 12px 32px -8px rgb(15 23 42 / 0.16), 0 4px 8px -4px rgb(15 23 42 / 0.08);
+  --shadow-xl: 0 24px 64px -12px rgb(15 23 42 / 0.24), 0 8px 24px -8px rgb(15 23 42 / 0.12);
+  --shadow-glow-blue: 0 0 0 1px rgb(59 130 246 / 0.15), 0 8px 24px -4px rgb(59 130 246 / 0.35);
 }
 
 /* ============================================
@@ -48,6 +61,7 @@
   --color-gray-900: #0B1220; /* app background */
   --color-gray-800: #111827; /* surface */
   --color-gray-700: #1F2937; /* card */
+  --color-gray-750: #253140; /* hairline divider/track — subtler than the border color */
   --color-gray-650: #26334a; /* hover background */
   --color-gray-600: #2D3748; /* border */
   --color-gray-500: #64748B;
@@ -55,10 +69,22 @@
   --color-gray-300: #CBD5E1;
   --color-white: #FFFFFF;    /* primary text back to real white */
   color-scheme: dark;
+
+  /* Premium elevation needs its own dark values — the light-mode shadow
+     formula above is built on a light rgb base and reads as almost
+     invisible against dark surfaces. */
+  --shadow-lg: 0 12px 32px -8px rgb(0 0 0 / 0.45), 0 4px 8px -4px rgb(0 0 0 / 0.3);
+  --shadow-xl: 0 24px 64px -12px rgb(0 0 0 / 0.55), 0 8px 24px -8px rgb(0 0 0 / 0.35);
+
+  /* Canvas gradient mesh — a touch more visible in dark mode, where a soft glow reads as premium rather than muddy */
+  --canvas-glow-1: color-mix(in srgb, var(--color-blue-500) 8%, transparent);
+  --canvas-glow-2: color-mix(in srgb, var(--color-blue-500) 6%, transparent);
 }
 
 :root {
   color-scheme: light;
+  --canvas-glow-1: color-mix(in srgb, var(--color-blue-500) 4%, transparent);
+  --canvas-glow-2: color-mix(in srgb, var(--color-blue-500) 3%, transparent);
 }
 
 /* ============================================
@@ -74,6 +100,21 @@ body {
 #root {
   position: relative;
   z-index: 1;
+}
+
+/* Subtle canvas gradient mesh — non-interactive, sits behind #root's
+   solid-background content for free (see z-index above). Kept barely-there
+   in light mode; a touch more visible in dark mode where soft glows read
+   as premium instead of muddy. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(600px circle at 10% -10%, var(--canvas-glow-1), transparent 60%),
+    radial-gradient(500px circle at 110% 20%, var(--canvas-glow-2), transparent 60%);
 }
 
 ::selection {
@@ -110,11 +151,28 @@ body {
    COMPONENT UTILITIES
    ============================================ */
 @layer components {
-  /* Solid enterprise panel — used by modals, dropdowns, command palette */
+  /* Real translucent glass — scoped deliberately narrow: only the floating,
+     above-a-scrim surfaces (Modal, SidePanel, Dropdown, Toast, CommandPalette).
+     Bento cards and tables stay solid + shadow-lg — no blur — so "glass"
+     keeps meaning "floating" and doesn't get diluted into generic decoration. */
   .glass {
-    background: var(--color-gray-800);
-    border: 1px solid var(--color-gray-600);
-    box-shadow: var(--shadow-md);
+    background: color-mix(in srgb, var(--color-gray-800) 72%, transparent);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    border: 1px solid color-mix(in srgb, var(--color-gray-600) 60%, transparent);
+    box-shadow: var(--shadow-xl);
+  }
+
+  /* Bento/premium-surface hover — box-shadow only. Any consumer that also
+     drives its own Framer Motion whileHover transform (e.g. StatCard) is
+     safe to combine with this: Framer's inline transform always wins over
+     this class's transform, so the two layer without fighting. */
+  .bento-hover {
+    transition: box-shadow 200ms ease, transform 200ms ease;
+  }
+  .bento-hover:hover {
+    box-shadow: var(--shadow-xl);
+    transform: translateY(-2px);
   }
 
   /* Legacy hover-lift, kept for not-yet-restyled "Classic" pages only —

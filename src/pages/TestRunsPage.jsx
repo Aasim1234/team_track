@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Plus, ArrowLeft, Lock, Unlock, PlayCircle } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
@@ -7,12 +7,13 @@ import ProjectSidebar from '../components/ProjectSidebar'
 import AppHeader from '../components/AppHeader'
 import PageHeader from '../components/PageHeader'
 import NewTestRunModal from '../components/NewTestRunModal'
+import RunCaseRail from '../components/RunCaseRail'
+import RunCaseExecutionPanel from '../components/RunCaseExecutionPanel'
+import useRunCaseShortcuts from '../hooks/useRunCaseShortcuts'
 import EnterpriseTable from '../components/ui/EnterpriseTable'
 import StatusBadge from '../components/ui/StatusBadge'
 import StatusProgressBar from '../components/ui/StatusProgressBar'
 import EmptyState from '../components/ui/EmptyState'
-import Modal from '../components/ui/Modal'
-import FormField, { inputClass } from '../components/ui/FormField'
 import { RUN_STATUS, TEST_RUN_RESULT } from '../lib/statusConfig'
 
 function timeAgo(dateStr) {
@@ -34,7 +35,7 @@ function countsFor(rows) {
 }
 
 export default function TestRunsPage() {
-  const { id: projectId, runId } = useParams()
+  const { id: projectId, runId, runCaseId } = useParams()
   const navigate = useNavigate()
   const { user } = useAuth()
 
@@ -60,7 +61,7 @@ export default function TestRunsPage() {
           .eq('project_id', projectId)
           .order('created_at', { ascending: false }),
         supabase.from('test_run_case_current_status').select('*').eq('project_id', projectId),
-        supabase.from('test_cases').select('id, human_id, title').eq('project_id', projectId).order('human_id'),
+        supabase.from('test_cases').select('id, human_id, title, preconditions, objective').eq('project_id', projectId).order('human_id'),
         supabase.from('project_members').select('user_id, profiles(id, name)').eq('project_id', projectId),
         user
           ? supabase.from('project_members').select('role').eq('project_id', projectId).eq('user_id', user.id).maybeSingle()
@@ -95,6 +96,7 @@ export default function TestRunsPage() {
       <TestRunDetail
         projectId={projectId}
         runId={runId}
+        runCaseId={runCaseId}
         project={project}
         cases={cases}
         members={members}
@@ -216,16 +218,21 @@ export default function TestRunsPage() {
   )
 }
 
-function TestRunDetail({ projectId, runId, project, cases, members, canAuthor, userId, onRefreshList }) {
+function TestRunDetail({ projectId, runId, runCaseId, project, cases, members, canAuthor, userId, onRefreshList }) {
   const navigate = useNavigate()
   const [run, setRun] = useState(null)
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
+  const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState([])
-  const [activeRunCase, setActiveRunCase] = useState(null)
 
   const caseById = Object.fromEntries(cases.map((c) => [c.id, c]))
-  const memberById = Object.fromEntries(members.map((m) => [m.id, m]))
+  const caseOrderIndex = Object.fromEntries(cases.map((c, i) => [c.id, i]))
+
+  const sortedRows = useMemo(
+    () => [...rows].sort((a, b) => (caseOrderIndex[a.test_case_id] ?? 0) - (caseOrderIndex[b.test_case_id] ?? 0)),
+    [rows, cases]
+  )
 
   const fetchRun = async () => {
     const [{ data: runRow }, { data: statusData }] = await Promise.all([
@@ -235,11 +242,18 @@ function TestRunDetail({ projectId, runId, project, cases, members, canAuthor, u
     setRun(runRow)
     setRows(statusData || [])
     setLoading(false)
+    return statusData || []
   }
 
   useEffect(() => {
     fetchRun()
+    setSelectMode(false)
+    setSelected([])
   }, [runId])
+
+  const goToCase = (id) => {
+    navigate(`/project/${projectId}/runs/${runId}/case/${id}`, { replace: true })
+  }
 
   const toggleStatus = async () => {
     const newStatus = run.status === 'active' ? 'closed' : 'active'
@@ -249,29 +263,49 @@ function TestRunDetail({ projectId, runId, project, cases, members, canAuthor, u
     onRefreshList()
   }
 
-  const recordResult = async (runCaseId, status, comment, elapsedMinutes) => {
+  const recordResult = async (targetRunCaseId, status, comment, elapsedMinutes) => {
     await supabase.from('test_results').insert({
-      run_case_id: runCaseId,
+      run_case_id: targetRunCaseId,
       status,
       comment: comment || null,
       elapsed_minutes: elapsedMinutes || null,
       executed_by: userId,
     })
-    fetchRun()
+    await fetchRun()
+    const idx = sortedRows.findIndex((r) => r.run_case_id === targetRunCaseId)
+    const next = sortedRows.slice(idx + 1).find((r) => r.current_status === 'untested')
+    if (next) goToCase(next.run_case_id)
   }
 
-  const bulkMark = async (selectedRows, status) => {
+  const bulkMark = async (selectedIds, status) => {
     await supabase.from('test_results').insert(
-      selectedRows.map((r) => ({ run_case_id: r.run_case_id, status, executed_by: userId }))
+      selectedIds.map((id) => ({ run_case_id: id, status, executed_by: userId }))
     )
     setSelected([])
     fetchRun()
   }
 
-  const reassign = async (runCaseId, assignedTo) => {
-    await supabase.from('test_run_cases').update({ assigned_to: assignedTo || null }).eq('id', runCaseId)
+  const reassign = async (targetRunCaseId, assignedTo) => {
+    await supabase.from('test_run_cases').update({ assigned_to: assignedTo || null }).eq('id', targetRunCaseId)
     fetchRun()
   }
+
+  const activeRunCaseId = runCaseId || sortedRows[0]?.run_case_id
+  const activeRunCase = sortedRows.find((r) => r.run_case_id === activeRunCaseId) || null
+  const activeIndex = activeRunCase ? sortedRows.findIndex((r) => r.run_case_id === activeRunCaseId) : -1
+
+  const goRelative = (delta) => {
+    if (activeIndex === -1) return
+    const target = sortedRows[activeIndex + delta]
+    if (target) goToCase(target.run_case_id)
+  }
+
+  useRunCaseShortcuts({
+    enabled: Boolean(activeRunCase) && canAuthor && run?.status === 'active' && !selectMode,
+    onNext: () => goRelative(1),
+    onPrev: () => goRelative(-1),
+    onMark: (status) => recordResult(activeRunCaseId, status, '', null),
+  })
 
   if (loading || !run) {
     return (
@@ -290,9 +324,9 @@ function TestRunDetail({ projectId, runId, project, cases, members, canAuthor, u
   const passRate = executed > 0 ? Math.round(((counts.passed || 0) / executed) * 100) : 0
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex">
+    <div className="h-screen bg-gray-900 text-white flex">
       <ProjectSidebar />
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 flex flex-col h-screen">
         <AppHeader
           breadcrumb={[
             { label: 'Projects', to: '/dashboard' },
@@ -317,164 +351,55 @@ function TestRunDetail({ projectId, runId, project, cases, members, canAuthor, u
           }
         />
 
-        <div className="p-6">
+        <div className="px-6 pt-4 flex-shrink-0">
           <button
             onClick={() => navigate(`/project/${projectId}/runs`)}
-            className="flex items-center gap-1.5 text-[13px] text-gray-500 hover:text-white mb-4"
+            className="flex items-center gap-1.5 text-[13px] text-gray-500 hover:text-white mb-3"
           >
             <ArrowLeft size={14} /> All Test Runs
           </button>
-
-          <div className="mb-4 max-w-xl">
+          <div className="max-w-xl mb-4">
             <StatusProgressBar domain={TEST_RUN_RESULT} counts={counts} showLegend height="h-2.5" />
           </div>
-
-          <EnterpriseTable
-            rows={rows}
-            rowKey={(r) => r.run_case_id}
-            onRowClick={(r) => setActiveRunCase(r)}
-            selectable={canAuthor && run.status === 'active'}
-            selected={selected}
-            onSelectionChange={setSelected}
-            bulkActions={[
-              { label: 'Mark Passed', onClick: (sel) => bulkMark(sel, 'passed') },
-              { label: 'Mark Failed', onClick: (sel) => bulkMark(sel, 'failed'), destructive: true },
-            ]}
-            emptyState={<EmptyState title="No test cases in this run" description="This run has no cases — delete it and create a new one with cases selected." />}
-            columns={[
-              {
-                key: 'case',
-                label: 'Case',
-                render: (r) => (
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-mono text-blue-500">{caseById[r.test_case_id]?.human_id}</span>
-                    <span className="text-white">{caseById[r.test_case_id]?.title || 'Unknown case'}</span>
-                  </div>
-                ),
-              },
-              {
-                key: 'assigned',
-                label: 'Assigned To',
-                render: (r) => (
-                  <div onClick={(e) => e.stopPropagation()}>
-                    <select
-                      value={r.assigned_to || ''}
-                      onChange={(e) => reassign(r.run_case_id, e.target.value)}
-                      disabled={!canAuthor}
-                      className="text-[12px] bg-transparent border border-gray-600 rounded-md px-1.5 py-1 outline-none disabled:opacity-70"
-                    >
-                      <option value="">Unassigned</option>
-                      {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
-                  </div>
-                ),
-              },
-              { key: 'status', label: 'Status', render: (r) => <StatusBadge domain={TEST_RUN_RESULT} value={r.current_status} dot /> },
-              {
-                key: 'last',
-                label: 'Last Executed',
-                render: (r) => r.last_executed_at ? `${memberById[r.last_executed_by]?.name || 'Someone'} · ${timeAgo(r.last_executed_at)}` : '—',
-              },
-            ]}
-          />
         </div>
-      </div>
 
-      {activeRunCase && (
-        <RecordResultModal
-          runCase={activeRunCase}
-          testCase={caseById[activeRunCase.test_case_id]}
-          runOpen={run.status === 'active'}
-          onClose={() => setActiveRunCase(null)}
-          onSubmit={(status, comment, elapsed) => {
-            recordResult(activeRunCase.run_case_id, status, comment, elapsed)
-            setActiveRunCase(null)
-          }}
-        />
-      )}
-    </div>
-  )
-}
-
-function RecordResultModal({ runCase, testCase, runOpen, onClose, onSubmit }) {
-  const [status, setStatus] = useState('passed')
-  const [comment, setComment] = useState('')
-  const [elapsed, setElapsed] = useState('')
-  const [history, setHistory] = useState([])
-  const [loadingHistory, setLoadingHistory] = useState(true)
-
-  useEffect(() => {
-    supabase
-      .from('test_results')
-      .select('*, profiles(name)')
-      .eq('run_case_id', runCase.run_case_id)
-      .order('executed_at', { ascending: false })
-      .then(({ data }) => {
-        setHistory(data || [])
-        setLoadingHistory(false)
-      })
-  }, [runCase.run_case_id])
-
-  return (
-    <Modal open onClose={onClose} title={`${testCase?.human_id || ''} — ${testCase?.title || 'Test case'}`} size="lg">
-      <div className="space-y-4">
-        {runOpen ? (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              onSubmit(status, comment, elapsed ? Number(elapsed) : null)
-            }}
-            className="space-y-3 pb-4 border-b border-gray-600"
-          >
-            <FormField label="Result">
-              <select value={status} onChange={(e) => setStatus(e.target.value)} className={inputClass}>
-                {Object.entries(TEST_RUN_RESULT).filter(([k]) => k !== 'untested').map(([k, v]) => (
-                  <option key={k} value={k}>{v.label}</option>
-                ))}
-              </select>
-            </FormField>
-            <div className="grid grid-cols-[1fr_100px] gap-3">
-              <FormField label="Comment">
-                <input value={comment} onChange={(e) => setComment(e.target.value)} className={inputClass} placeholder="Optional" />
-              </FormField>
-              <FormField label="Elapsed (min)">
-                <input type="number" min="0" value={elapsed} onChange={(e) => setElapsed(e.target.value)} className={inputClass} />
-              </FormField>
-            </div>
-            <button type="submit" className="w-full bg-blue-500 hover:bg-blue-400 py-2 rounded-md text-[13px] font-semibold text-white">
-              Add Result
-            </button>
-          </form>
+        {rows.length === 0 ? (
+          <div className="px-6">
+            <EmptyState title="No test cases in this run" description="This run has no cases — delete it and create a new one with cases selected." />
+          </div>
         ) : (
-          <p className="text-[12px] text-gray-500 pb-4 border-b border-gray-600">
-            This run is closed — reopen it to record new results.
-          </p>
+          <div className="flex-1 min-h-0 flex border-t border-gray-600">
+            <RunCaseRail
+              rows={sortedRows}
+              caseById={caseById}
+              activeRunCaseId={activeRunCaseId}
+              onSelect={goToCase}
+              canAuthor={canAuthor}
+              runActive={run.status === 'active'}
+              selectMode={selectMode}
+              onToggleSelectMode={() => { setSelectMode((s) => !s); setSelected([]) }}
+              selected={selected}
+              onToggleSelected={(id) => setSelected((prev) => (prev.includes(id) ? prev.filter((k) => k !== id) : [...prev, id]))}
+              bulkActions={[
+                { label: 'Mark Passed', onClick: (sel) => bulkMark(sel, 'passed') },
+                { label: 'Mark Failed', onClick: (sel) => bulkMark(sel, 'failed'), destructive: true },
+              ]}
+            />
+            <RunCaseExecutionPanel
+              runCase={activeRunCase}
+              testCase={activeRunCase ? caseById[activeRunCase.test_case_id] : null}
+              members={members}
+              canAuthor={canAuthor}
+              runActive={run.status === 'active'}
+              position={{ index: activeIndex + 1, total: sortedRows.length }}
+              onReassign={reassign}
+              onSubmitResult={recordResult}
+              onPrev={() => goRelative(-1)}
+              onNext={() => goRelative(1)}
+            />
+          </div>
         )}
-
-        <div>
-          <p className="text-[11px] text-gray-500 uppercase font-semibold tracking-wide mb-2">History</p>
-          {loadingHistory ? (
-            <p className="text-[12px] text-gray-500">Loading…</p>
-          ) : history.length === 0 ? (
-            <p className="text-[12px] text-gray-500">No results recorded yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {history.map((h) => (
-                <div key={h.id} className="flex items-start gap-2 text-[12px]">
-                  <StatusBadge domain={TEST_RUN_RESULT} value={h.status} size="sm" />
-                  <div className="flex-1 min-w-0">
-                    {h.comment && <p className="text-gray-300">{h.comment}</p>}
-                    <p className="text-gray-500">
-                      {h.profiles?.name || 'Someone'} · {timeAgo(h.executed_at)}
-                      {h.elapsed_minutes ? ` · ${h.elapsed_minutes}m` : ''}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </div>
-    </Modal>
+    </div>
   )
 }

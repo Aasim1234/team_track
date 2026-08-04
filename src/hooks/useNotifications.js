@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from './useAuth'
 
@@ -6,6 +6,10 @@ export function useNotifications() {
   const { user } = useAuth()
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
+  // Unique per hook instance — more than one component (e.g. NotificationBell
+  // and a Dashboard widget) can call useNotifications() on the same page, and
+  // Supabase throws if two channels share a name and one is already subscribed.
+  const instanceId = useRef(Math.random().toString(36).slice(2))
 
   const fetchNotifications = async () => {
     if (!user) return
@@ -24,7 +28,7 @@ export function useNotifications() {
     fetchNotifications()
 
     const channel = supabase
-      .channel('notifications-channel-' + user.id)
+      .channel(`notifications-channel-${user.id}-${instanceId.current}`)
       .on(
         'postgres_changes',
         {

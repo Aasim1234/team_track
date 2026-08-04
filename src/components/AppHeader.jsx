@@ -95,7 +95,7 @@ export default function AppHeader({ breadcrumb = [], onQuickCreate, quickCreateL
       <div className="flex-1 flex justify-center min-w-0">
         <button
           onClick={openCommandPalette}
-          className="flex items-center gap-2 w-full max-w-md px-3 py-1.5 rounded-md bg-gray-700 border border-gray-600 hover:border-gray-500 text-gray-500 text-[13px]"
+          className="flex items-center gap-2 w-full max-w-md px-3 py-1.5 rounded-md bg-gray-700 border border-gray-600 shadow-xs hover:border-gray-500 hover:bg-gray-650 transition-colors duration-150 text-gray-500 text-[13px]"
         >
           <Search size={14} />
           <span className="flex-1 text-left">Search projects, test cases, issues…</span>

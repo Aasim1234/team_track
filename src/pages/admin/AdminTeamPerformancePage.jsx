@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Users, ListChecks, CheckCircle2, Clock, AlertTriangle, TrendingUp, Timer, Loader,
-  Eye, Bug, PlayCircle,
+  Eye, LayoutGrid, Rows3, Trophy,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
 import AdminSidebar from '../../components/AdminSidebar'
@@ -9,48 +10,11 @@ import AppHeader from '../../components/AppHeader'
 import PageHeader from '../../components/PageHeader'
 import EnterpriseTable from '../../components/ui/EnterpriseTable'
 import StatusBadge from '../../components/ui/StatusBadge'
-import SidePanel from '../../components/ui/SidePanel'
-import { MEMBER_STATUS, PROJECT_MEMBER_ROLE, TEST_RUN_RESULT } from '../../lib/statusConfig'
-
-const ROLE_RANK = { admin: 4, lead: 3, tester: 2, viewer: 1 }
-
-function toDate(dateStr) {
-  if (!dateStr) return null
-  const hasOffset = /[Zz]$|[+-]\d{2}:?\d{2}$/.test(dateStr)
-  const d = new Date(hasOffset ? dateStr : `${dateStr}Z`)
-  return Number.isNaN(d.getTime()) ? null : d
-}
-
-function isToday(dateStr) {
-  const d = toDate(dateStr)
-  return d ? d.toDateString() === new Date().toDateString() : false
-}
-
-function timeAgo(dateStr) {
-  const d = toDate(dateStr)
-  if (!d) return 'Never'
-  const seconds = Math.floor((Date.now() - d.getTime()) / 1000)
-  if (seconds < 60) return 'Just now'
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
-}
-
-function StatCard({ icon: Icon, label, value, tint }) {
-  return (
-    <div className="bg-gray-800 border border-gray-600 rounded-lg p-4 flex items-center gap-3">
-      <span className={`w-9 h-9 rounded-md flex items-center justify-center flex-shrink-0 ${tint}`}>
-        <Icon size={17} />
-      </span>
-      <div className="min-w-0">
-        <p className="text-xl font-semibold text-white leading-tight truncate">{value}</p>
-        <p className="text-[12px] text-gray-500">{label}</p>
-      </div>
-    </div>
-  )
-}
+import StatCard from '../../components/ui/StatCard'
+import ProgressRing from '../../components/ui/ProgressRing'
+import TeamMemberCard from '../../components/TeamMemberCard'
+import { MEMBER_STATUS, PROJECT_MEMBER_ROLE } from '../../lib/statusConfig'
+import { computeMemberStats, isToday, toDate, timeAgo } from '../../lib/performanceScore'
 
 function MiniBar({ label, pct, color }) {
   return (
@@ -64,24 +28,14 @@ function MiniBar({ label, pct, color }) {
   )
 }
 
-function Stars({ rating }) {
-  return (
-    <span className="text-amber-500 text-[13px] tracking-tight" title={`${rating} / 5`}>
-      {'★'.repeat(rating)}
-      <span className="text-gray-300">{'★'.repeat(5 - rating)}</span>
-    </span>
-  )
-}
-
 export default function AdminTeamPerformancePage() {
+  const navigate = useNavigate()
   const [issues, setIssues] = useState([])
   const [results, setResults] = useState([])
   const [memberships, setMemberships] = useState([])
   const [sprints, setSprints] = useState([])
   const [loading, setLoading] = useState(true)
-  const [selected, setSelected] = useState(null)
-  const [timeline, setTimeline] = useState([])
-  const [loadingTimeline, setLoadingTimeline] = useState(false)
+  const [viewMode, setViewMode] = useState('table')
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -110,75 +64,9 @@ export default function AdminTeamPerformancePage() {
 
     const activeSprintIds = new Set(sprints.map((s) => s.id))
 
-    const rows = Object.values(byUser).map(({ profile, memberships: mems }) => {
-      const role = mems.reduce((best, m) => (ROLE_RANK[m.role] > ROLE_RANK[best] ? m.role : best), 'viewer')
-      const myIssues = issues.filter((i) => i.assignee_id === profile.id)
-      const myBugsReported = issues.filter((i) => i.type === 'bug' && i.reporter_id === profile.id)
-      const myBugsFixed = issues.filter((i) => i.type === 'bug' && i.assignee_id === profile.id && i.status === 'done')
-      const myResults = results.filter((r) => r.executed_by === profile.id)
-      const myResultsToday = myResults.filter((r) => isToday(r.executed_at))
-
-      const total = myIssues.length
-      const completed = myIssues.filter((i) => i.status === 'done').length
-      const remaining = total - completed
-      const overdue = myIssues.filter((i) => i.due_date && new Date(i.due_date) < new Date() && i.status !== 'done').length
-      const completedToday = myIssues.filter((i) => i.status === 'done' && isToday(i.updated_at)).length
-
-      const mySprintIssues = myIssues.filter((i) => activeSprintIds.has(i.sprint_id))
-      const sprintDone = mySprintIssues.filter((i) => i.status === 'done').length
-      const sprintProgress = mySprintIssues.length ? Math.round((sprintDone / mySprintIssues.length) * 100) : null
-
-      const loggedMinutesToday = myResultsToday.reduce((sum, r) => sum + (r.elapsed_minutes || 0), 0)
-
-      const timestamps = [...myIssues.map((i) => i.updated_at), ...myResults.map((r) => r.executed_at)]
-        .map(toDate)
-        .filter(Boolean)
-      const lastActivity = timestamps.length ? new Date(Math.max(...timestamps.map((d) => d.getTime()))) : null
-
-      let status = 'offline'
-      if (lastActivity) {
-        const minsAgo = (Date.now() - lastActivity.getTime()) / 60000
-        if (minsAgo < 15) status = 'working'
-        else if (minsAgo < 120) status = 'idle'
-      }
-
-      const taskCompletionPct = total > 0 ? Math.round((completed / total) * 100) : 0
-      const passRate = myResults.length ? myResults.filter((r) => r.status === 'passed').length / myResults.length : null
-      const onTimeRate = completed > 0
-        ? myIssues.filter((i) => i.status === 'done' && (!i.due_date || new Date(i.updated_at) <= new Date(i.due_date))).length / completed
-        : null
-      const ratingComponents = [taskCompletionPct / 100, passRate, onTimeRate].filter((v) => v !== null)
-      const avgScore = ratingComponents.length ? ratingComponents.reduce((a, b) => a + b, 0) / ratingComponents.length : 0
-      const rating = Math.max(1, Math.min(5, Math.round(1 + avgScore * 4)))
-
-      const projectBadges = mems.map((m) => ({ key: m.projects?.key, name: m.projects?.name, projectId: m.project_id }))
-
-      return {
-        id: profile.id,
-        name: profile.name,
-        email: profile.email,
-        role,
-        projectBadges,
-        activeProjects: new Set(mems.map((m) => m.project_id)).size,
-        total, completed, remaining, overdue, completedToday,
-        testsExecuted: myResults.length,
-        testsPassedToday: myResultsToday.filter((r) => r.status === 'passed').length,
-        testsFailedToday: myResultsToday.filter((r) => r.status === 'failed').length,
-        testsBlockedToday: myResultsToday.filter((r) => r.status === 'blocked').length,
-        testsExecutedToday: myResultsToday.length,
-        bugsReported: myBugsReported.length,
-        bugsFixed: myBugsFixed.length,
-        bugsReportedToday: myBugsReported.filter((i) => isToday(i.created_at)).length,
-        bugsFixedToday: myBugsFixed.filter((i) => isToday(i.updated_at)).length,
-        loggedMinutesToday,
-        taskCompletionPct,
-        sprintProgress,
-        lastActivity,
-        status,
-        rating,
-        myIssues,
-      }
-    })
+    const rows = Object.values(byUser).map(({ profile, memberships: mems }) =>
+      computeMemberStats(profile, mems, { issues, results, activeSprintIds })
+    )
 
     return rows.sort((a, b) => a.name.localeCompare(b.name))
   }, [issues, results, memberships, sprints])
@@ -208,51 +96,41 @@ export default function AdminTeamPerformancePage() {
     }
   }, [issues, members.length])
 
-  const openDetails = (member) => {
-    setSelected(member)
-    setLoadingTimeline(true)
-    supabase
-      .from('activity_log')
-      .select('*')
-      .eq('actor_id', member.id)
-      .order('created_at', { ascending: false })
-      .limit(30)
-      .then(({ data }) => {
-        const issueTitle = (id) => issues.find((i) => i.id === id)?.title || 'a task'
+  const openProfile = (member) => navigate(`/admin/team-performance/${member.id}`)
 
-        const taskEvents = (data || [])
-          .filter((a) => a.action_type === 'status_changed' && (a.new_value === 'in_progress' || a.new_value === 'done'))
-          .map((a) => ({
-            id: `act-${a.id}`,
-            type: a.new_value === 'in_progress' ? 'Task Started' : 'Task Completed',
-            label: issueTitle(a.issue_id),
-            at: a.created_at,
-          }))
-
-        const bugEvents = issues
-          .filter((i) => i.type === 'bug' && i.reporter_id === member.id)
-          .map((i) => ({ id: `bug-${i.id}`, type: 'Bug Created', label: i.title, at: i.created_at }))
-
-        const testEvents = results
-          .filter((r) => r.executed_by === member.id)
-          .map((r) => ({ id: `res-${r.id}`, type: 'Test Case Executed', label: r.status, at: r.executed_at }))
-
-        const merged = [...taskEvents, ...bugEvents, ...testEvents]
-          .filter((e) => e.at)
-          .sort((a, b) => (toDate(b.at)?.getTime() || 0) - (toDate(a.at)?.getTime() || 0))
-          .slice(0, 25)
-
-        setTimeline(merged)
-        setLoadingTimeline(false)
-      })
-  }
+  const leaderboard = useMemo(
+    () => [...members].sort((a, b) => b.performanceScore - a.performanceScore),
+    [members]
+  )
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex">
       <AdminSidebar />
       <div className="flex-1 min-w-0">
         <AppHeader breadcrumb={[{ label: 'Administration', to: '/admin' }, { label: 'Team Performance' }]} />
-        <PageHeader title="Team Performance" subtitle="Daily productivity, assigned work, and performance across your team" />
+        <PageHeader
+          title="Team Performance"
+          subtitle="Daily productivity, assigned work, and performance across your team"
+          actions={
+            <div className="flex items-center gap-1 border border-gray-600 rounded-md p-0.5">
+              {[
+                { key: 'table', label: 'Table', icon: Rows3 },
+                { key: 'cards', label: 'Cards', icon: LayoutGrid },
+                { key: 'leaderboard', label: 'Leaderboard', icon: Trophy },
+              ].map((v) => (
+                <button
+                  key={v.key}
+                  onClick={() => setViewMode(v.key)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[12px] font-medium transition-colors duration-150 ${
+                    viewMode === v.key ? 'bg-blue-500 text-white' : 'text-gray-400 hover:text-white'
+                  }`}
+                >
+                  <v.icon size={13} /> {v.label}
+                </button>
+              ))}
+            </div>
+          }
+        />
 
         <div className="p-6">
           {loading ? (
@@ -272,11 +150,28 @@ export default function AdminTeamPerformancePage() {
             </div>
           )}
 
+          {viewMode === 'cards' && !loading && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              {members.map((m) => <TeamMemberCard key={m.id} member={m} />)}
+              {members.length === 0 && <p className="text-[13px] text-gray-500 text-center py-10 col-span-full">No team members yet — add members to a project from Users &amp; Roles.</p>}
+            </div>
+          )}
+
+          {viewMode === 'leaderboard' && !loading && (
+            <div className="space-y-2 max-w-xl">
+              {leaderboard.map((m, i) => <TeamMemberCard key={m.id} member={m} rank={i + 1} />)}
+              {leaderboard.length === 0 && <p className="text-[13px] text-gray-500 text-center py-10">No team members yet — add members to a project from Users &amp; Roles.</p>}
+            </div>
+          )}
+
+          {viewMode === 'table' && (
           <EnterpriseTable
             loading={loading}
             rows={members}
             rowKey={(m) => m.id}
-            onRowClick={openDetails}
+            onRowClick={openProfile}
+            stickyHeader
+            maxHeight="65vh"
             emptyState={<p className="text-[13px] text-gray-500 text-center py-10">No team members yet — add members to a project from Users &amp; Roles.</p>}
             columns={[
               {
@@ -324,12 +219,15 @@ export default function AdminTeamPerformancePage() {
               { key: 'lastActivity', label: 'Last Activity', render: (m) => timeAgo(m.lastActivity?.toISOString()) },
               { key: 'status', label: 'Status', render: (m) => <StatusBadge domain={MEMBER_STATUS} value={m.status} dot /> },
               { key: 'overdue', label: 'Due', render: (m) => m.overdue > 0 ? <span className="text-red-600 font-medium">{m.overdue}</span> : '0' },
-              { key: 'rating', label: 'Rating', render: (m) => <Stars rating={m.rating} /> },
+              {
+                key: 'rating', label: 'Score',
+                render: (m) => <ProgressRing percent={m.performanceScore} size={28} strokeColor="stroke-blue-500" label={String(m.performanceScore)} />,
+              },
               {
                 key: 'actions', label: '', width: '90px',
                 render: (m) => (
                   <button
-                    onClick={(e) => { e.stopPropagation(); openDetails(m) }}
+                    onClick={(e) => { e.stopPropagation(); openProfile(m) }}
                     className="flex items-center gap-1 text-[12px] text-blue-600 hover:underline"
                   >
                     <Eye size={13} /> View
@@ -338,89 +236,15 @@ export default function AdminTeamPerformancePage() {
               },
             ]}
           />
+          )}
 
+          {viewMode === 'table' && (
           <p className="text-[11px] text-gray-500 mt-3">
             TC = Task Completion · DP = Daily Productivity (relative to today's top performer) · SP = Sprint Progress (active sprint only)
           </p>
+          )}
         </div>
       </div>
-
-      <SidePanel
-        open={!!selected}
-        onClose={() => setSelected(null)}
-        title={selected?.name}
-        subtitle={selected?.email}
-        width="lg"
-      >
-        {selected && (
-          <div className="space-y-6">
-            <div>
-              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Today's Work</p>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { label: 'Assigned', value: selected.total },
-                  { label: 'Completed Today', value: selected.completedToday },
-                  { label: 'Pending', value: selected.remaining },
-                  { label: 'Overdue', value: selected.overdue },
-                  { label: 'Tests Executed Today', value: selected.testsExecutedToday },
-                  { label: 'Passed', value: selected.testsPassedToday },
-                  { label: 'Failed', value: selected.testsFailedToday },
-                  { label: 'Blocked', value: selected.testsBlockedToday },
-                  { label: 'Bugs Created', value: selected.bugsReportedToday },
-                  { label: 'Bugs Resolved', value: selected.bugsFixedToday },
-                ].map((s) => (
-                  <div key={s.label} className="border border-gray-600 rounded-md px-3 py-2">
-                    <p className="text-lg font-semibold text-white">{s.value}</p>
-                    <p className="text-[11px] text-gray-500">{s.label}</p>
-                  </div>
-                ))}
-                <div className="border border-gray-600 rounded-md px-3 py-2 col-span-2">
-                  <p className="text-lg font-semibold text-white">
-                    {selected.loggedMinutesToday > 0 ? `${Math.floor(selected.loggedMinutesToday / 60)}h ${selected.loggedMinutesToday % 60}m` : '—'}
-                  </p>
-                  <p className="text-[11px] text-gray-500">Logged Time Today (from recorded test execution durations)</p>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">Recent Activity</p>
-              {loadingTimeline ? (
-                <p className="text-[12px] text-gray-500">Loading…</p>
-              ) : timeline.length === 0 ? (
-                <p className="text-[12px] text-gray-500">No recent activity.</p>
-              ) : (
-                <div className="space-y-2.5">
-                  {timeline.map((e) => (
-                    <div key={e.id} className="flex items-start gap-2.5 text-[12px]">
-                      <span className="mt-0.5 flex-shrink-0">
-                        {e.type === 'Test Case Executed' && <PlayCircle size={13} className="text-blue-500" />}
-                        {e.type === 'Bug Created' && <Bug size={13} className="text-red-500" />}
-                        {e.type === 'Task Started' && <Loader size={13} className="text-orange-500" />}
-                        {e.type === 'Task Completed' && <CheckCircle2 size={13} className="text-green-500" />}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-gray-300">
-                          <span className="font-medium text-white">{e.type}</span>
-                          {e.type === 'Test Case Executed' ? (
-                            <> — <StatusBadge domain={TEST_RUN_RESULT} value={e.label} size="sm" /></>
-                          ) : (
-                            <span className="text-gray-400"> — {e.label}</span>
-                          )}
-                        </p>
-                        <p className="text-gray-500">{timeAgo(e.at)}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <p className="text-[11px] text-gray-500 mt-3">
-                Login/logout tracking isn't available — this app doesn't log session times.
-              </p>
-            </div>
-          </div>
-        )}
-      </SidePanel>
     </div>
   )
 }

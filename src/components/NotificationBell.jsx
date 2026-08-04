@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Bell, UserPlus, RefreshCw, MessageSquare } from 'lucide-react'
 import { useNotifications } from '../hooks/useNotifications'
 
 function timeAgo(dateStr) {
@@ -14,9 +15,9 @@ function timeAgo(dateStr) {
 }
 
 const TYPE_ICON = {
-  assigned: '👤',
-  status_changed: '🔄',
-  comment: '💬',
+  assigned: UserPlus,
+  status_changed: RefreshCw,
+  comment: MessageSquare,
 }
 
 export default function NotificationBell() {
@@ -36,7 +37,7 @@ export default function NotificationBell() {
         onClick={() => setOpen(!open)}
         className="relative text-gray-300 hover:text-white p-2"
       >
-        <span className="text-lg">🔔</span>
+        <Bell size={16} />
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
             {unreadCount > 9 ? '9+' : unreadCount}
@@ -47,8 +48,8 @@ export default function NotificationBell() {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)}></div>
-          <div className="absolute right-0 mt-2 w-80 bg-gray-800 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto border border-gray-700">
-            <div className="flex justify-between items-center p-3 border-b border-gray-700">
+          <div className="absolute right-0 mt-2 w-80 bg-gray-800 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto border border-gray-600">
+            <div className="flex justify-between items-center p-3 border-b border-gray-600">
               <span className="font-semibold text-white text-sm">Notifications</span>
               {unreadCount > 0 && (
                 <button
@@ -64,24 +65,27 @@ export default function NotificationBell() {
               <p className="text-gray-500 text-sm p-4 text-center">No notifications yet.</p>
             )}
 
-            {notifications.map((n) => (
-              <div
-                key={n.id}
-                onClick={() => handleClick(n)}
-                className={`p-3 border-b border-gray-700 cursor-pointer hover:bg-gray-700 ${
-                  !n.read ? 'bg-gray-700/50' : ''
-                }`}
-              >
-                <div className="flex gap-2 items-start">
-                  <span>{TYPE_ICON[n.type] || '🔔'}</span>
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-200">{n.message}</p>
-                    <p className="text-xs text-gray-500 mt-1">{timeAgo(n.created_at)}</p>
+            {notifications.map((n) => {
+              const Icon = TYPE_ICON[n.type] || Bell
+              return (
+                <div
+                  key={n.id}
+                  onClick={() => handleClick(n)}
+                  className={`p-3 border-b border-gray-600 cursor-pointer hover:bg-gray-650 ${
+                    !n.read ? 'bg-gray-650/60' : ''
+                  }`}
+                >
+                  <div className="flex gap-2 items-start">
+                    <Icon size={14} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-200">{n.message}</p>
+                      <p className="text-xs text-gray-500 mt-1">{timeAgo(n.created_at)}</p>
+                    </div>
+                    {!n.read && <span className="w-2 h-2 rounded-full bg-green-500 mt-1"></span>}
                   </div>
-                  {!n.read && <span className="w-2 h-2 rounded-full bg-green-500 mt-1"></span>}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </>
       )}

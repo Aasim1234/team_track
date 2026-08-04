@@ -408,15 +408,14 @@ export default function TestCasesPage() {
         </div>
       </div>
 
-      {showNewCase && (
-        <NewTestCaseModal
-          sections={sectionsWithPath}
-          defaultSectionId={selectedSectionId}
-          members={members}
-          onClose={() => setShowNewCase(false)}
-          onCreated={fetchAll}
-        />
-      )}
+      <NewTestCaseModal
+        open={showNewCase}
+        sections={sectionsWithPath}
+        defaultSectionId={selectedSectionId}
+        members={members}
+        onClose={() => setShowNewCase(false)}
+        onCreated={fetchAll}
+      />
     </div>
   )
 }

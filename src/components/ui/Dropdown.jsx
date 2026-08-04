@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { scaleIn, TRANSITION } from '../../lib/motion'
 
 export default function Dropdown({ trigger, children, align = 'left', width = 'w-56' }) {
   const [open, setOpen] = useState(false)
@@ -6,16 +8,21 @@ export default function Dropdown({ trigger, children, align = 'left', width = 'w
   return (
     <div className="relative inline-block">
       <div onClick={() => setOpen((o) => !o)}>{trigger}</div>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div
-            className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} top-full mt-1 ${width} glass rounded-md z-40 py-1 animate-scale-in`}
+      {open && <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            variants={scaleIn}
+            transition={TRANSITION}
+            className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} top-full mt-1 ${width} glass rounded-md z-40 py-1 origin-top`}
           >
             {typeof children === 'function' ? children({ close: () => setOpen(false) }) : children}
-          </div>
-        </>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

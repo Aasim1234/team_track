@@ -8,21 +8,8 @@ import EnterpriseTable from '../components/ui/EnterpriseTable'
 import StatusBadge from '../components/ui/StatusBadge'
 import StatusProgressBar from '../components/ui/StatusProgressBar'
 import EmptyState from '../components/ui/EmptyState'
+import StatCard from '../components/ui/StatCard'
 import { TEST_CASE_PRIORITY, AUTOMATION_STATUS, PROJECT_MEMBER_ROLE } from '../lib/statusConfig'
-
-function StatCard({ icon: Icon, label, value, tint }) {
-  return (
-    <div className="bg-gray-800 border border-gray-600 rounded-lg p-4 flex items-center gap-3">
-      <span className={`w-9 h-9 rounded-md flex items-center justify-center flex-shrink-0 ${tint}`}>
-        <Icon size={17} />
-      </span>
-      <div className="min-w-0">
-        <p className="text-xl font-semibold text-white leading-tight">{value}</p>
-        <p className="text-[12px] text-gray-500">{label}</p>
-      </div>
-    </div>
-  )
-}
 
 export default function ProjectOverviewPage() {
   const { id } = useParams()

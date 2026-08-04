@@ -9,6 +9,7 @@ import EnterpriseTable from '../../components/ui/EnterpriseTable'
 import EmptyState from '../../components/ui/EmptyState'
 import Modal from '../../components/ui/Modal'
 import FormField, { inputClass } from '../../components/ui/FormField'
+import PrimaryButton from '../../components/ui/Button'
 import { useToast } from '../../components/ui/Toast'
 
 const COLOR_OPTIONS = Object.keys(COLOR_MAP)
@@ -163,13 +164,9 @@ export default function AdminCustomizationsPage() {
               ))}
             </div>
           </FormField>
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full bg-blue-500 hover:bg-blue-400 disabled:opacity-50 py-2 rounded-md text-[13px] font-semibold text-white"
-          >
+          <PrimaryButton type="submit" disabled={saving}>
             {saving ? 'Creating…' : 'Create Label'}
-          </button>
+          </PrimaryButton>
         </form>
       </Modal>
 
@@ -192,13 +189,9 @@ export default function AdminCustomizationsPage() {
                 ))}
               </div>
             </FormField>
-            <button
-              type="submit"
-              disabled={saving}
-              className="w-full bg-blue-500 hover:bg-blue-400 disabled:opacity-50 py-2 rounded-md text-[13px] font-semibold text-white"
-            >
+            <PrimaryButton type="submit" disabled={saving}>
               {saving ? 'Saving…' : 'Save Changes'}
-            </button>
+            </PrimaryButton>
           </form>
         )}
       </Modal>

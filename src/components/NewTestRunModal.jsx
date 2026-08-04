@@ -3,6 +3,7 @@ import { Search } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import Modal from './ui/Modal'
 import FormField, { inputClass } from './ui/FormField'
+import PrimaryButton from './ui/Button'
 import { useToast } from './ui/Toast'
 
 export default function NewTestRunModal({ open, onClose, projectId, cases, members, onCreated }) {
@@ -140,13 +141,9 @@ export default function NewTestRunModal({ open, onClose, projectId, cases, membe
           </select>
         </FormField>
 
-        <button
-          type="submit"
-          disabled={saving}
-          className="w-full bg-blue-500 hover:bg-blue-400 disabled:opacity-50 py-2 rounded-md text-[13px] font-semibold text-white"
-        >
+        <PrimaryButton type="submit" disabled={saving}>
           {saving ? 'Creating…' : 'Create Test Run'}
-        </button>
+        </PrimaryButton>
       </form>
     </Modal>
   )

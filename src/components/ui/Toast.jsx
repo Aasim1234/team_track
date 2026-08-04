@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { CheckCircle2, XCircle, Info, X } from 'lucide-react'
+import { slideInFromTopRight, TRANSITION } from '../../lib/motion'
 
 const ToastContext = createContext(null)
 
@@ -38,29 +40,37 @@ export function ToastProvider({ children }) {
     <ToastContext.Provider value={toast}>
       {children}
       <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 w-full max-w-sm pointer-events-none">
-        {toasts.map((t) => {
-          const v = VARIANTS[t.variant] || VARIANTS.info
-          const Icon = v.icon
-          return (
-            <div
-              key={t.id}
-              role="status"
-              className="glass rounded-lg overflow-hidden animate-slide-in-right pointer-events-auto"
-            >
-              <div className="flex items-start gap-2.5 px-3.5 py-3">
-                <Icon size={17} className={`${v.iconClass} flex-shrink-0 mt-0.5`} />
-                <p className="text-[13px] text-white flex-1 leading-snug">{t.message}</p>
-                <button
-                  onClick={() => dismiss(t.id)}
-                  className="text-gray-500 hover:text-white p-0.5 rounded flex-shrink-0"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-              <div className={`h-0.5 ${v.barClass}`} />
-            </div>
-          )
-        })}
+        <AnimatePresence>
+          {toasts.map((t) => {
+            const v = VARIANTS[t.variant] || VARIANTS.info
+            const Icon = v.icon
+            return (
+              <motion.div
+                key={t.id}
+                role="status"
+                layout
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                variants={slideInFromTopRight}
+                transition={TRANSITION}
+                className="glass rounded-lg overflow-hidden pointer-events-auto"
+              >
+                <div className="flex items-start gap-2.5 px-3.5 py-3">
+                  <Icon size={17} className={`${v.iconClass} flex-shrink-0 mt-0.5`} />
+                  <p className="text-[13px] text-white flex-1 leading-snug">{t.message}</p>
+                  <button
+                    onClick={() => dismiss(t.id)}
+                    className="text-gray-500 hover:text-white p-0.5 rounded flex-shrink-0"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                <div className={`h-0.5 ${v.barClass}`} />
+              </motion.div>
+            )
+          })}
+        </AnimatePresence>
       </div>
     </ToastContext.Provider>
   )

@@ -1,3 +1,4 @@
+import { motion } from 'framer-motion'
 import { resolveStatus } from '../../lib/statusConfig'
 
 export default function StatusProgressBar({ domain, counts, showLegend = false, height = 'h-2' }) {
@@ -6,17 +7,20 @@ export default function StatusProgressBar({ domain, counts, showLegend = false, 
 
   return (
     <div>
-      <div className={`w-full bg-gray-100 rounded-full overflow-hidden flex ${height}`}>
+      <div className={`w-full bg-gray-750 rounded-full overflow-hidden flex ${height}`}>
         {total === 0 ? (
-          <div className="w-full h-full bg-gray-100" />
+          <div className="w-full h-full bg-gray-750" />
         ) : (
           entries.map(([key, count]) => {
             const s = resolveStatus(domain, key)
+            const pct = (count / total) * 100
             return (
-              <div
+              <motion.div
                 key={key}
                 className={s.bar}
-                style={{ width: `${(count / total) * 100}%` }}
+                initial={{ width: 0 }}
+                animate={{ width: `${pct}%` }}
+                transition={{ duration: 0.5, ease: 'easeOut' }}
                 title={`${s.label}: ${count}`}
               />
             )

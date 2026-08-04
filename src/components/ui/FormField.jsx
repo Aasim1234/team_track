@@ -1,7 +1,7 @@
 // Shared className for native <input>/<select>/<textarea> elements so every
 // form across the app has the same compact, thin-border, enterprise look.
 export const inputClass =
-  'w-full px-2.5 py-1.5 rounded-md bg-gray-700 border border-gray-600 text-[13px] text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30'
+  'w-full px-2.5 py-1.5 rounded-md bg-gray-700 border border-gray-600 text-[13px] text-white outline-none transition-colors duration-150 focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30'
 
 export default function FormField({ label, required, error, hint, children, htmlFor }) {
   return (

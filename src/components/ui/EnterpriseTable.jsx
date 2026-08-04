@@ -1,4 +1,7 @@
-import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
+import { Fragment } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronRight } from 'lucide-react'
+import { scaleIn, fadeIn, TRANSITION } from '../../lib/motion'
 
 export default function EnterpriseTable({
   columns,
@@ -13,9 +16,20 @@ export default function EnterpriseTable({
   onSortChange,
   loading = false,
   emptyState,
+  expandable = false,
+  expandedKeys = [],
+  onExpandedChange,
+  expandedRowRender,
+  // Opt-in only — defaults to false so existing tables are unaffected.
+  // See the contained-scroll note below for why this is safe to enable
+  // per-table rather than a page-level sticky header.
+  stickyHeader = false,
+  maxHeight = '60vh',
 }) {
   const selectedSet = new Set(selected)
+  const expandedSet = new Set(expandedKeys)
   const allSelected = rows.length > 0 && rows.every((r) => selectedSet.has(rowKey(r)))
+  const columnCount = columns.length + (selectable ? 1 : 0) + (expandable ? 1 : 0)
 
   const toggleAll = () => {
     if (!onSelectionChange) return
@@ -25,6 +39,11 @@ export default function EnterpriseTable({
   const toggleRow = (key) => {
     if (!onSelectionChange) return
     onSelectionChange(selectedSet.has(key) ? selected.filter((k) => k !== key) : [...selected, key])
+  }
+
+  const toggleExpanded = (key) => {
+    if (!onExpandedChange) return
+    onExpandedChange(expandedSet.has(key) ? expandedKeys.filter((k) => k !== key) : [...expandedKeys, key])
   }
 
   const handleSort = (col) => {
@@ -37,7 +56,7 @@ export default function EnterpriseTable({
     return (
       <div className="border border-gray-600 rounded-lg overflow-hidden">
         {[0, 1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-10 border-b border-gray-100 last:border-0 bg-gray-700 animate-pulse" />
+          <div key={i} className="h-10 border-b border-gray-750 last:border-0 bg-gray-700 animate-pulse" />
         ))}
       </div>
     )
@@ -46,6 +65,8 @@ export default function EnterpriseTable({
   if (rows.length === 0 && emptyState) {
     return emptyState
   }
+
+  const theadClass = stickyHeader ? 'sticky top-0 z-10' : ''
 
   return (
     <div>
@@ -69,12 +90,16 @@ export default function EnterpriseTable({
         </div>
       )}
 
-      <div className="border border-gray-600 rounded-lg overflow-x-auto">
+      <div
+        className={`border border-gray-600 rounded-lg overflow-x-auto ${stickyHeader ? 'overflow-y-auto overscroll-contain' : ''}`}
+        style={stickyHeader ? { maxHeight } : undefined}
+      >
         <table className="w-full text-[13px]">
-          <thead>
+          <thead className={theadClass}>
             <tr>
+              {expandable && <th className={`bg-gray-700 w-8 px-2 py-2 ${theadClass}`} />}
               {selectable && (
-                <th className="bg-gray-700 w-9 px-3 py-2">
+                <th className={`bg-gray-700 w-9 px-3 py-2 ${theadClass}`}>
                   <input type="checkbox" checked={allSelected} onChange={toggleAll} className="accent-blue-500" />
                 </th>
               )}
@@ -83,18 +108,31 @@ export default function EnterpriseTable({
                   key={col.key}
                   style={col.width ? { width: col.width } : undefined}
                   onClick={() => handleSort(col)}
-                  className={`bg-gray-700 text-left px-3 py-2 text-[11px] font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap ${
+                  className={`bg-gray-700 text-left px-3 py-2 text-[11px] font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap ${theadClass} ${
                     col.sortable ? 'cursor-pointer select-none hover:text-gray-300' : ''
                   }`}
                 >
                   <span className="flex items-center gap-1">
                     {col.label}
-                    {col.sortable &&
-                      (sort?.key === col.key ? (
-                        sort.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
-                      ) : (
-                        <ChevronsUpDown size={12} className="text-gray-400" />
-                      ))}
+                    {col.sortable && (
+                      <AnimatePresence mode="wait" initial={false}>
+                        <motion.span
+                          key={sort?.key === col.key ? sort.direction : 'none'}
+                          variants={scaleIn}
+                          initial="initial"
+                          animate="animate"
+                          exit="exit"
+                          transition={TRANSITION}
+                          className="inline-flex"
+                        >
+                          {sort?.key === col.key ? (
+                            sort.direction === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />
+                          ) : (
+                            <ChevronsUpDown size={12} className="text-gray-400" />
+                          )}
+                        </motion.span>
+                      </AnimatePresence>
+                    )}
                   </span>
                 </th>
               ))}
@@ -103,28 +141,49 @@ export default function EnterpriseTable({
           <tbody>
             {rows.map((row) => {
               const key = rowKey(row)
+              const isExpanded = expandedSet.has(key)
               return (
-                <tr
-                  key={key}
-                  onClick={() => onRowClick?.(row)}
-                  className={`border-t border-gray-100 ${onRowClick ? 'cursor-pointer hover:bg-gray-650' : ''}`}
-                >
-                  {selectable && (
-                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={selectedSet.has(key)}
-                        onChange={() => toggleRow(key)}
-                        className="accent-blue-500"
-                      />
-                    </td>
+                <Fragment key={key}>
+                  <tr
+                    onClick={() => onRowClick?.(row)}
+                    className={`group border-t border-gray-750 ${onRowClick ? 'cursor-pointer hover:bg-gray-650' : ''}`}
+                  >
+                    {expandable && (
+                      <td className="px-2 py-2" onClick={(e) => { e.stopPropagation(); toggleExpanded(key) }}>
+                        <button className="text-gray-400 hover:text-white p-0.5 rounded hover:bg-gray-650">
+                          <ChevronRight size={13} className={`transition-transform duration-150 ${isExpanded ? 'rotate-90' : ''}`} />
+                        </button>
+                      </td>
+                    )}
+                    {selectable && (
+                      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedSet.has(key)}
+                          onChange={() => toggleRow(key)}
+                          className="accent-blue-500"
+                        />
+                      </td>
+                    )}
+                    {columns.map((col) => (
+                      <td
+                        key={col.key}
+                        className={`px-3 py-2 text-gray-300 align-middle ${onRowClick ? 'transition-colors duration-150 group-hover:text-white' : ''}`}
+                      >
+                        {col.render ? col.render(row) : row[col.key]}
+                      </td>
+                    ))}
+                  </tr>
+                  {expandable && isExpanded && (
+                    <tr className="border-t border-gray-750 bg-gray-750/40">
+                      <td colSpan={columnCount} className="px-4 py-3">
+                        <motion.div initial="initial" animate="animate" variants={fadeIn} transition={TRANSITION}>
+                          {expandedRowRender?.(row)}
+                        </motion.div>
+                      </td>
+                    </tr>
                   )}
-                  {columns.map((col) => (
-                    <td key={col.key} className="px-3 py-2 text-gray-300 align-middle">
-                      {col.render ? col.render(row) : row[col.key]}
-                    </td>
-                  ))}
-                </tr>
+                </Fragment>
               )
             })}
           </tbody>

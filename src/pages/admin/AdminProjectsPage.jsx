@@ -9,6 +9,7 @@ import PageHeader from '../../components/PageHeader'
 import EnterpriseTable from '../../components/ui/EnterpriseTable'
 import Modal from '../../components/ui/Modal'
 import FormField, { inputClass } from '../../components/ui/FormField'
+import PrimaryButton from '../../components/ui/Button'
 import { useToast } from '../../components/ui/Toast'
 
 export default function AdminProjectsPage() {
@@ -162,13 +163,9 @@ export default function AdminProjectsPage() {
           <FormField label="Key" required hint="Short uppercase code, e.g. VMS">
             <input value={key} onChange={(e) => setKey(e.target.value)} required maxLength={5} className={`${inputClass} w-28 uppercase`} />
           </FormField>
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full bg-blue-500 hover:bg-blue-400 disabled:opacity-50 py-2 rounded-md text-[13px] font-semibold text-white"
-          >
+          <PrimaryButton type="submit" disabled={saving}>
             {saving ? 'Creating…' : 'Create Project'}
-          </button>
+          </PrimaryButton>
         </form>
       </Modal>
 
@@ -200,13 +197,9 @@ export default function AdminProjectsPage() {
                 className={`${inputClass} resize-y`}
               />
             </FormField>
-            <button
-              type="submit"
-              disabled={saving}
-              className="w-full bg-blue-500 hover:bg-blue-400 disabled:opacity-50 py-2 rounded-md text-[13px] font-semibold text-white"
-            >
+            <PrimaryButton type="submit" disabled={saving}>
               {saving ? 'Saving…' : 'Save Changes'}
-            </button>
+            </PrimaryButton>
           </form>
         )}
       </Modal>

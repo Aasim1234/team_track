@@ -3,12 +3,14 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Clock, Star, Boxes, Plus,
   PanelLeftClose, PanelLeftOpen, ChevronDown,
-  LogOut, ArrowLeft, Home, ListChecks, PlayCircle, Flag,
+  ArrowLeft, Home, ListChecks, PlayCircle, Flag,
   BarChart3, CheckSquare, KanbanSquare,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
 import { getRecentIds, recordRecentProject } from '../lib/recentProjects'
+import SidebarNavButton from './ui/SidebarNavButton'
+import SidebarFooter from './ui/SidebarFooter'
 
 export { recordRecentProject }
 
@@ -28,25 +30,6 @@ function projectNavItems(projectId) {
     { to: `${base}/milestones`, label: 'Milestones', icon: Flag },
     { to: `${base}/reports`, label: 'Reports', icon: BarChart3 },
   ]
-}
-
-function NavButton({ item, active, collapsed, onClick }) {
-  const Icon = item.icon
-  return (
-    <button
-      onClick={onClick}
-      title={collapsed ? item.label : undefined}
-      className={`relative w-full flex items-center gap-2.5 rounded-md text-[13px] font-medium ${
-        collapsed ? 'justify-center px-0 py-2' : 'px-2.5 py-1.5'
-      } ${active ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:text-white hover:bg-gray-650'}`}
-    >
-      {active && (
-        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-full bg-blue-500" />
-      )}
-      <Icon size={15} strokeWidth={2} className="flex-shrink-0" />
-      {!collapsed && item.label}
-    </button>
-  )
 }
 
 function ProjectRow({ project, active, starred, onOpen, onToggleStar }) {
@@ -143,9 +126,6 @@ export default function ProjectSidebar() {
   const inProjectContext = Boolean(currentProjectId) && pathname.startsWith('/project/')
   const currentProject = projects.find((p) => p.id === currentProjectId)
 
-  const displayName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'User'
-  const initials = displayName.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
-
   return (
     <aside
       className={`${collapsed ? 'w-14' : 'w-[216px]'} flex-shrink-0 bg-gray-800 border-r border-gray-600 h-screen sticky top-0 flex flex-col transition-all duration-150`}
@@ -200,7 +180,8 @@ export default function ProjectSidebar() {
           <>
             <nav className="space-y-0.5">
               {projectNavItems(currentProjectId).map((item) => (
-                <NavButton
+                <SidebarNavButton
+                  indicatorId="project-nav-indicator"
                   key={item.to}
                   item={item}
                   collapsed={collapsed}
@@ -215,7 +196,8 @@ export default function ProjectSidebar() {
                   Classic
                 </p>
               )}
-              <NavButton
+              <SidebarNavButton
+                  indicatorId="project-nav-indicator"
                 item={{ to: `/project/${currentProjectId}/classic`, label: 'Kanban / Sprints', icon: KanbanSquare }}
                 collapsed={collapsed}
                 active={pathname.startsWith(`/project/${currentProjectId}/classic`)}
@@ -226,7 +208,8 @@ export default function ProjectSidebar() {
         ) : (
           <nav className="space-y-0.5">
             {NAV_ITEMS.map((item) => (
-              <NavButton
+              <SidebarNavButton
+                  indicatorId="project-nav-indicator"
                 key={item.to}
                 item={item}
                 collapsed={collapsed}
@@ -314,24 +297,7 @@ export default function ProjectSidebar() {
         )}
       </div>
 
-      <div className={`border-t border-gray-600 p-2 flex items-center gap-2 ${collapsed ? 'flex-col' : ''}`}>
-        <span className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">
-          {initials}
-        </span>
-        {!collapsed && (
-          <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-medium text-white truncate">{displayName}</p>
-            <p className="text-[10px] text-gray-500 truncate">{user?.email}</p>
-          </div>
-        )}
-        <button
-          onClick={() => supabase.auth.signOut()}
-          title="Logout"
-          className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-gray-650 flex-shrink-0"
-        >
-          <LogOut size={14} />
-        </button>
-      </div>
+      <SidebarFooter user={user} collapsed={collapsed} />
     </aside>
   )
 }

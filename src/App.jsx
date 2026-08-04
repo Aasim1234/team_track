@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Flag } from 'lucide-react'
 import { useAuth } from './hooks/useAuth'
 import { useProjectAdminAccess } from './hooks/useProjectAdminAccess'
@@ -18,17 +19,34 @@ import AdminOverviewPage from './pages/admin/AdminOverviewPage'
 import AdminProjectsPage from './pages/admin/AdminProjectsPage'
 import AdminUsersRolesPage from './pages/admin/AdminUsersRolesPage'
 import AdminTeamPerformancePage from './pages/admin/AdminTeamPerformancePage'
+import AdminMemberProfilePage from './pages/admin/AdminMemberProfilePage'
 import AdminAiHubPage from './pages/admin/AdminAiHubPage'
 import AdminCustomizationsPage from './pages/admin/AdminCustomizationsPage'
 import AdminIntegrationPage from './pages/admin/AdminIntegrationPage'
 import AdminDataManagementPage from './pages/admin/AdminDataManagementPage'
 import AdminSiteSettingsPage from './pages/admin/AdminSiteSettingsPage'
 
+// Fade + slight-upward-motion wrapper applied to every routed page. Living
+// here (rather than wrapping each <Route element>) means the whole app gets
+// consistent page-transition behavior from three edits instead of twenty.
+function PageTransition({ children }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 15 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      transition={{ duration: 0.25, ease: 'easeOut' }}
+    >
+      {children}
+    </motion.div>
+  )
+}
+
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">Loading...</div>
   if (!user) return <Navigate to="/login" replace />
-  return children
+  return <PageTransition>{children}</PageTransition>
 }
 
 function AdminRoute({ children }) {
@@ -39,22 +57,21 @@ function AdminRoute({ children }) {
   }
   if (!user) return <Navigate to="/login" replace />
   if (!isAdmin) return <Navigate to="/dashboard" replace />
-  return children
+  return <PageTransition>{children}</PageTransition>
 }
 
 function PublicRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">Loading...</div>
   if (user) return <Navigate to="/dashboard" replace />
-  return children
+  return <PageTransition>{children}</PageTransition>
 }
 
-function App() {
+function AnimatedRoutes() {
+  const location = useLocation()
   return (
-    <ToastProvider>
-    <BrowserRouter>
-      <CommandPalette />
-      <Routes>
+    <AnimatePresence>
+      <Routes location={location} key={location.pathname}>
         <Route
           path="/login"
           element={
@@ -100,6 +117,14 @@ function App() {
           element={
             <AdminRoute>
               <AdminTeamPerformancePage />
+            </AdminRoute>
+          }
+        />
+        <Route
+          path="/admin/team-performance/:memberId"
+          element={
+            <AdminRoute>
+              <AdminMemberProfilePage />
             </AdminRoute>
           }
         />
@@ -188,6 +213,14 @@ function App() {
           }
         />
         <Route
+          path="/project/:id/runs/:runId/case/:runCaseId"
+          element={
+            <ProtectedRoute>
+              <TestRunsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/project/:id/milestones"
           element={
             <ProtectedRoute>
@@ -234,7 +267,17 @@ function App() {
         />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
-    </BrowserRouter>
+    </AnimatePresence>
+  )
+}
+
+function App() {
+  return (
+    <ToastProvider>
+      <BrowserRouter>
+        <CommandPalette />
+        <AnimatedRoutes />
+      </BrowserRouter>
     </ToastProvider>
   )
 }

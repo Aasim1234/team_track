@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { AnimatePresence, motion } from 'framer-motion'
 import {
   Search, LayoutDashboard, Plus, FolderKanban, CircleDot, CornerDownLeft, ListChecks,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
 import { recordRecentProject } from '../lib/recentProjects'
+import { fadeIn, scaleIn, TRANSITION } from '../lib/motion'
 
 const ACTIONS = [
   { id: 'nav-dashboard', label: 'Go to Dashboard', icon: LayoutDashboard, to: '/dashboard' },
@@ -128,7 +130,7 @@ export default function CommandPalette() {
     }
   }
 
-  if (!user || !open) return null
+  if (!user) return null
 
   let flatIndex = -1
   const renderRow = (kind, item, icon, label, sub) => {
@@ -152,14 +154,23 @@ export default function CommandPalette() {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center pt-[16vh] px-4 animate-fade-in"
-      onClick={() => setOpen(false)}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-xl glass rounded-2xl shadow-2xl overflow-hidden animate-scale-in"
-      >
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-start justify-center pt-[16vh] px-4"
+          onClick={() => setOpen(false)}
+          initial="initial"
+          animate="animate"
+          exit="exit"
+          variants={fadeIn}
+          transition={TRANSITION}
+        >
+          <motion.div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-xl glass rounded-lg overflow-hidden"
+            variants={scaleIn}
+            transition={TRANSITION}
+          >
         <div className="flex items-center gap-2.5 px-4 py-3 border-b border-gray-600/40">
           <Search size={16} className="text-gray-500" />
           <input
@@ -244,7 +255,9 @@ export default function CommandPalette() {
             </p>
           )}
         </div>
-      </div>
-    </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }

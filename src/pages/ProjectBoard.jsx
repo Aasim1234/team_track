@@ -4,6 +4,7 @@ import { DndContext, closestCenter, PointerSensor, useSensor, useSensors } from 
 import { useDroppable, useDraggable } from '@dnd-kit/core'
 import {
   Plus, GripVertical, Calendar, MessageSquare, Paperclip, Link as LinkIcon, Users,
+  Pencil, Trash2, Bug, CheckSquare, BookOpen, Check, MoreHorizontal,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
@@ -14,6 +15,7 @@ import IssueListView from '../components/IssueListView'
 import ProjectSidebar from '../components/ProjectSidebar'
 import { recordRecentProject } from '../lib/recentProjects'
 import { useToast } from '../components/ui/Toast'
+import Dropdown, { DropdownItem } from '../components/ui/Dropdown'
 import ProjectSummary from '../components/ProjectSummary'
 import ProjectCode from '../components/ProjectCode'
 import ProjectForms from '../components/ProjectForms'
@@ -44,7 +46,7 @@ const PRIORITY_CHIP = {
   urgent: 'bg-red-500/15 text-red-400',
 }
 
-const TYPE_ICON = { bug: '🐞', task: '✅', story: '📗' }
+const TYPE_ICON = { bug: Bug, task: CheckSquare, story: BookOpen }
 
 const AVATAR_COLORS = ['bg-pink-500', 'bg-purple-500', 'bg-blue-500', 'bg-teal-500', 'bg-orange-500', 'bg-red-500']
 
@@ -61,9 +63,9 @@ function getInitials(name) {
 
 function IssueCard({ issue, onClick, onDelete, members, projectKey }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: issue.id })
-  const [showMenu, setShowMenu] = useState(false)
+  const isDragging = Boolean(transform)
   const style = transform
-    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0) scale(1.03) rotate(1.5deg)`, zIndex: 50 }
     : undefined
 
   const assigneeName = members.find((m) => m.id === issue.assignee_id)?.name
@@ -76,7 +78,9 @@ function IssueCard({ issue, onClick, onDelete, members, projectKey }) {
       {...listeners}
       {...attributes}
       onClick={() => onClick(issue)}
-      className="group relative bg-gray-700/80 border border-gray-600/40 hover:border-gray-500/60 rounded-lg p-3 mb-2 cursor-pointer touch-none"
+      className={`group relative bg-gray-700/80 border rounded-lg p-3 mb-2 cursor-pointer touch-none transition-shadow duration-150 ${
+        isDragging ? 'border-blue-500/60 shadow-md shadow-black/30' : 'border-gray-600/40 hover:border-gray-500/60'
+      }`}
     >
       <div className="flex justify-between items-start gap-1.5">
         <GripVertical
@@ -84,46 +88,36 @@ function IssueCard({ issue, onClick, onDelete, members, projectKey }) {
           className="text-gray-500 opacity-0 group-hover:opacity-70 flex-shrink-0 mt-0.5 -ml-1 cursor-grab"
         />
         <p className="text-[13px] font-medium text-white leading-snug flex-1">{issue.title}</p>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <div className="relative">
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu) }}
-              className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-white w-5 h-5 flex items-center justify-center rounded hover:bg-gray-600"
-            >
-              ⋯
-            </button>
-            {showMenu && (
+        <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          <Dropdown
+            align="right"
+            width="w-36"
+            trigger={
+              <button className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-white w-5 h-5 flex items-center justify-center rounded hover:bg-gray-600">
+                <MoreHorizontal size={14} />
+              </button>
+            }
+          >
+            {({ close }) => (
               <>
-                <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setShowMenu(false) }}></div>
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  className="absolute top-full right-0 mt-1 bg-gray-900 border border-gray-700 rounded-lg shadow-lg z-20 py-1 w-36"
+                <DropdownItem icon={Pencil} onClick={() => { onClick(issue); close() }}>
+                  Edit
+                </DropdownItem>
+                <DropdownItem
+                  icon={LinkIcon}
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/project/${issue.project_id}/issue/${issue.id}`)
+                    close()
+                  }}
                 >
-                  <button
-                    onClick={() => { onClick(issue); setShowMenu(false) }}
-                    className="w-full text-left px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-700"
-                  >
-                    ✏️ Edit
-                  </button>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/project/${issue.project_id}/issue/${issue.id}`)
-                      setShowMenu(false)
-                    }}
-                    className="w-full text-left px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-700"
-                  >
-                    🔗 Copy link
-                  </button>
-                  <button
-                    onClick={() => { onDelete(issue); setShowMenu(false) }}
-                    className="w-full text-left px-3 py-1.5 text-xs text-red-400 hover:bg-gray-700"
-                  >
-                    🗑 Delete
-                  </button>
-                </div>
+                  Copy link
+                </DropdownItem>
+                <DropdownItem icon={Trash2} destructive onClick={() => { onDelete(issue); close() }}>
+                  Delete
+                </DropdownItem>
               </>
             )}
-          </div>
+          </Dropdown>
         </div>
       </div>
 
@@ -153,7 +147,8 @@ function IssueCard({ issue, onClick, onDelete, members, projectKey }) {
 
       <div className="flex items-center gap-2.5 mt-2.5">
         <span className="text-[11px] text-gray-500 font-medium flex items-center gap-1">
-          {TYPE_ICON[issue.type] || ''} {projectKey}-{issue.issue_number || '—'}
+          {(() => { const TypeIcon = TYPE_ICON[issue.type]; return TypeIcon ? <TypeIcon size={11} /> : null })()}
+          {projectKey}-{issue.issue_number || '—'}
         </span>
         {issue._comments > 0 && (
           <span className="text-[11px] text-gray-500 flex items-center gap-0.5">
@@ -166,7 +161,7 @@ function IssueCard({ issue, onClick, onDelete, members, projectKey }) {
           </span>
         )}
         <span
-          className={`ml-auto w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white ${
+          className={`ml-auto w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white ring-2 ring-gray-700 ${
             issue.assignee_id ? getAvatarColor(assigneeName) : 'bg-gray-600 border border-dashed border-gray-500'
           }`}
           title={assigneeName || 'Unassigned'}
@@ -179,17 +174,19 @@ function IssueCard({ issue, onClick, onDelete, members, projectKey }) {
 }
 
 function Column({ column, droppableId, issues, onCardClick, onDeleteIssue, onAddIssue, members, projectKey }) {
-  const { setNodeRef } = useDroppable({ id: droppableId })
+  const { setNodeRef, isOver } = useDroppable({ id: droppableId })
   return (
     <div className="w-72 flex-shrink-0">
       <div className={`h-1 rounded-t-lg ${column.bar}`} />
       <div
         ref={setNodeRef}
-        className="bg-gray-800/70 border border-t-0 border-gray-600/25 rounded-b-xl p-2.5 min-h-[140px]"
+        className={`border border-t-0 rounded-b-lg p-2.5 min-h-[140px] transition-colors duration-150 ${
+          isOver ? 'bg-blue-500/10 border-blue-500/40' : 'bg-gray-800/70 border-gray-600/25'
+        }`}
       >
         <div className="flex items-center gap-2 px-1 pb-2.5">
           {column.check ? (
-            <span className="text-green-400 text-xs">✓</span>
+            <Check size={12} className="text-green-400" />
           ) : (
             <span className={`w-2 h-2 rounded-full ${column.dot}`}></span>
           )}
@@ -375,8 +372,8 @@ export default function ProjectBoard() {
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className="w-72 flex-shrink-0 space-y-2">
                 <div className="h-8 bg-gray-800 rounded-lg" />
-                <div className="h-24 bg-gray-800/70 rounded-xl" />
-                <div className="h-24 bg-gray-800/50 rounded-xl" />
+                <div className="h-24 bg-gray-800/70 rounded-lg" />
+                <div className="h-24 bg-gray-800/50 rounded-lg" />
               </div>
             ))}
           </div>
