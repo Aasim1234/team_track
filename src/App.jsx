@@ -10,6 +10,7 @@ import IssueDetailPage from './pages/IssueDetailPage'
 import ProjectOverviewPage from './pages/ProjectOverviewPage'
 import TestCasesPage from './pages/TestCasesPage'
 import TestRunsPage from './pages/TestRunsPage'
+import VmsTestPlansPage from './pages/VmsTestPlansPage'
 import TodoPage from './pages/TodoPage'
 import ReportsPage from './pages/ReportsPage'
 import CommandPalette from './components/CommandPalette'
@@ -217,6 +218,22 @@ function AnimatedRoutes() {
           element={
             <ProtectedRoute>
               <TestRunsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/project/:id/plans"
+          element={
+            <ProtectedRoute>
+              <VmsTestPlansPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/project/:id/plans/:planId"
+          element={
+            <ProtectedRoute>
+              <VmsTestPlansPage />
             </ProtectedRoute>
           }
         />

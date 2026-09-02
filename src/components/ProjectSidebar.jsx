@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Clock, Star, Boxes, Plus,
   PanelLeftClose, PanelLeftOpen, ChevronDown,
   ArrowLeft, Home, ListChecks, PlayCircle, Flag,
-  BarChart3, CheckSquare, KanbanSquare,
+  BarChart3, CheckSquare, KanbanSquare, ClipboardList,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
@@ -27,6 +27,7 @@ function projectNavItems(projectId) {
     { to: `${base}/todo`, label: 'To-Do', icon: CheckSquare },
     { to: `${base}/cases`, label: 'Test Cases', icon: ListChecks },
     { to: `${base}/runs`, label: 'Test Runs & Results', icon: PlayCircle },
+    { to: `${base}/plans`, label: 'VMS Test Plans', icon: ClipboardList },
     { to: `${base}/milestones`, label: 'Milestones', icon: Flag },
     { to: `${base}/reports`, label: 'Reports', icon: BarChart3 },
   ]

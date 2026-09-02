@@ -91,6 +91,19 @@ export const GOAL_STATUS = {
   done: { label: 'Done', color: 'blue' },
 }
 
+export const TEST_PLAN_STATUS = {
+  draft: { label: 'Draft', color: 'gray' },
+  active: { label: 'Active', color: 'blue' },
+  completed: { label: 'Completed', color: 'green' },
+}
+
+export const TEST_PLAN_ITEM_STATUS = {
+  not_started: { label: 'Not Started', color: 'gray' },
+  in_progress: { label: 'In Progress', color: 'blue' },
+  blocked: { label: 'Blocked', color: 'orange' },
+  done: { label: 'Done', color: 'green' },
+}
+
 export function resolveStatus(domain, value) {
   const entry = domain?.[value]
   if (!entry) return { label: value ?? '—', ...COLOR_MAP.gray }
