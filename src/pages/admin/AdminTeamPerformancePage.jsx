@@ -5,6 +5,7 @@ import {
   Eye, LayoutGrid, Rows3, Trophy,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
+import { fetchAllRows } from '../../lib/fetchAllRows'
 import AdminSidebar from '../../components/AdminSidebar'
 import AppHeader from '../../components/AppHeader'
 import PageHeader from '../../components/PageHeader'
@@ -41,7 +42,7 @@ export default function AdminTeamPerformancePage() {
     const fetchAll = async () => {
       const [{ data: issueRows }, { data: resultRows }, { data: memberRows }, { data: sprintRows }] = await Promise.all([
         supabase.from('issues').select('id, title, type, status, assignee_id, reporter_id, due_date, created_at, updated_at, project_id, sprint_id'),
-        supabase.from('test_results').select('id, executed_by, status, executed_at, elapsed_minutes'),
+        fetchAllRows(() => supabase.from('test_results').select('id, executed_by, status, executed_at, elapsed_minutes').order('id')),
         supabase.from('project_members').select('user_id, role, project_id, profiles(id, name, email), projects(name, key)'),
         supabase.from('sprints').select('id, project_id, status').eq('status', 'active'),
       ])

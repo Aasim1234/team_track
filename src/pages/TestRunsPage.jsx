@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { Plus, ArrowLeft, Lock, Unlock, PlayCircle } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
+import { fetchAllRows } from '../lib/fetchAllRows'
 import { useAuth } from '../hooks/useAuth'
 import ProjectSidebar from '../components/ProjectSidebar'
 import AppHeader from '../components/AppHeader'
@@ -60,8 +61,10 @@ export default function TestRunsPage() {
           .select('*, creator:profiles!created_by(name)')
           .eq('project_id', projectId)
           .order('created_at', { ascending: false }),
-        supabase.from('test_run_case_current_status').select('*').eq('project_id', projectId),
-        supabase.from('test_cases').select('id, human_id, title, preconditions, objective').eq('project_id', projectId).order('human_id'),
+        fetchAllRows(() =>
+          supabase.from('test_run_case_current_status').select('*').eq('project_id', projectId).order('run_case_id')),
+        fetchAllRows(() =>
+          supabase.from('test_cases').select('id, human_id, title, preconditions, objective').eq('project_id', projectId).order('human_id').order('id')),
         supabase.from('project_members').select('user_id, profiles(id, name)').eq('project_id', projectId),
         user
           ? supabase.from('project_members').select('role').eq('project_id', projectId).eq('user_id', user.id).maybeSingle()

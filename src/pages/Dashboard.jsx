@@ -7,6 +7,7 @@ import {
   CalendarClock, UserPlus, RefreshCw, MessageSquare, Bell, Rocket,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
+import { fetchAllRows } from '../lib/fetchAllRows'
 import { useAuth } from '../hooks/useAuth'
 import { useNotifications } from '../hooks/useNotifications'
 import ProjectSidebar from '../components/ProjectSidebar'
@@ -167,10 +168,10 @@ export default function Dashboard() {
     ] = await Promise.all([
       supabase.from('projects').select('*').order('created_at', { ascending: false }),
       supabase.from('issues').select('id, project_id, title, type, status, priority, assignee_id, due_date, created_at, sprint_id'),
-      supabase.from('test_cases').select('id, project_id, automation_status'),
+      fetchAllRows(() => supabase.from('test_cases').select('id, project_id, automation_status').order('id')),
       supabase.from('test_runs').select('id, project_id, status'),
-      supabase.from('test_run_case_current_status').select('current_status'),
-      supabase.from('test_results').select('id, executed_at'),
+      fetchAllRows(() => supabase.from('test_run_case_current_status').select('current_status, run_case_id').order('run_case_id')),
+      fetchAllRows(() => supabase.from('test_results').select('id, executed_at').order('id')),
       supabase.from('activity_log').select('*, profiles(name)').order('created_at', { ascending: false }).limit(8),
       supabase.from('sprints').select('id, project_id, name, status').eq('status', 'active'),
       user ? supabase.from('starred_projects').select('project_id').eq('user_id', user.id) : Promise.resolve({ data: [] }),

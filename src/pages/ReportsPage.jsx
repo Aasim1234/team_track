@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { BarChart3 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
+import { fetchAllRows } from '../lib/fetchAllRows'
 import ProjectSidebar from '../components/ProjectSidebar'
 import AppHeader from '../components/AppHeader'
 import PageHeader from '../components/PageHeader'
@@ -38,8 +39,10 @@ export default function ReportsPage() {
       const [{ data: proj }, { data: runRowsData }, { data: caseRows }, { data: runCaseRows }] = await Promise.all([
         supabase.from('projects').select('*').eq('id', projectId).single(),
         supabase.from('test_runs').select('id, name, status').eq('project_id', projectId).order('created_at', { ascending: false }),
-        supabase.from('test_cases').select('id, human_id, title, priority, test_type, automation_status').eq('project_id', projectId),
-        supabase.from('test_run_cases').select('test_case_id').eq('project_id', projectId),
+        fetchAllRows(() =>
+          supabase.from('test_cases').select('id, human_id, title, priority, test_type, automation_status').eq('project_id', projectId).order('id')),
+        fetchAllRows(() =>
+          supabase.from('test_run_cases').select('test_case_id').eq('project_id', projectId).order('id')),
       ])
       setProject(proj)
       setRuns(runRowsData || [])

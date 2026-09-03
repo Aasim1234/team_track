@@ -4,6 +4,7 @@ import {
   Plus, ChevronRight, ChevronDown, FolderTree, Search, X, ArrowLeft,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
+import { fetchAllRows } from '../lib/fetchAllRows'
 import { useAuth } from '../hooks/useAuth'
 import ProjectSidebar from '../components/ProjectSidebar'
 import AppHeader from '../components/AppHeader'
@@ -131,12 +132,15 @@ export default function TestCasesPage() {
       await Promise.all([
         supabase.from('projects').select('*').eq('id', projectId).single(),
         supabase.from('test_suites').select('*').eq('project_id', projectId).order('created_at'),
-        supabase.from('sections').select('*').eq('project_id', projectId).order('sort_order'),
-        supabase
-          .from('test_cases')
-          .select('*')
-          .eq('project_id', projectId)
-          .order('created_at', { ascending: false }),
+        fetchAllRows(() =>
+          supabase.from('sections').select('*').eq('project_id', projectId).order('sort_order').order('id')),
+        fetchAllRows(() =>
+          supabase
+            .from('test_cases')
+            .select('*')
+            .eq('project_id', projectId)
+            .order('created_at', { ascending: false })
+            .order('id')),
         supabase.from('project_members').select('user_id, profiles(id, name)').eq('project_id', projectId),
         user
           ? supabase.from('project_members').select('role').eq('project_id', projectId).eq('user_id', user.id).maybeSingle()
@@ -207,8 +211,26 @@ export default function TestCasesPage() {
     fetchAll()
   }
 
+  // Selecting a section shows its own cases plus everything filed in its
+  // sub-sections — otherwise a parent that only groups children reads as empty.
+  const selectedScope = useMemo(() => {
+    if (!selectedSectionId) return null
+    const ids = new Set([selectedSectionId])
+    let grew = true
+    while (grew) {
+      grew = false
+      for (const s of sections) {
+        if (s.parent_section_id && ids.has(s.parent_section_id) && !ids.has(s.id)) {
+          ids.add(s.id)
+          grew = true
+        }
+      }
+    }
+    return ids
+  }, [selectedSectionId, sections])
+
   const filteredCases = cases.filter((c) => {
-    if (selectedSectionId && c.section_id !== selectedSectionId) return false
+    if (selectedScope && !selectedScope.has(c.section_id)) return false
     if (search && !`${c.human_id} ${c.title}`.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
