@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Plus, ArrowLeft, ClipboardList, Link2, Unlink, Trash2, Pencil } from 'lucide-react'
+import { Plus, ArrowLeft, ClipboardList, Link2, Unlink, Trash2, Pencil, Download } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
+import { fetchAllRows } from '../lib/fetchAllRows'
 import { useAuth } from '../hooks/useAuth'
 import ProjectSidebar from '../components/ProjectSidebar'
 import AppHeader from '../components/AppHeader'
 import PageHeader from '../components/PageHeader'
 import NewTestPlanModal from '../components/NewTestPlanModal'
+import ExportTestPlanModal from '../components/ExportTestPlanModal'
 import EnterpriseTable from '../components/ui/EnterpriseTable'
 import StatusBadge from '../components/ui/StatusBadge'
 import StatusProgressBar from '../components/ui/StatusProgressBar'
@@ -44,12 +46,14 @@ export default function VmsTestPlansPage() {
   const [myRole, setMyRole] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showNewPlan, setShowNewPlan] = useState(false)
+  const [showExport, setShowExport] = useState(false)
+  const [suites, setSuites] = useState([])
 
   const canAuthor = ['admin', 'lead', 'tester'].includes(myRole)
   const canDelete = ['admin', 'lead'].includes(myRole)
 
   const fetchAll = async () => {
-    const [{ data: proj }, { data: planRows }, { data: runRows }, { data: statusData }, { data: memberRows }, { data: roleRow }] =
+    const [{ data: proj }, { data: planRows }, { data: runRows }, { data: statusData }, { data: memberRows }, { data: roleRow }, { data: suiteRows }] =
       await Promise.all([
         supabase.from('projects').select('*').eq('id', projectId).single(),
         supabase
@@ -58,11 +62,13 @@ export default function VmsTestPlansPage() {
           .eq('project_id', projectId)
           .order('created_at', { ascending: false }),
         supabase.from('test_runs').select('id, name, status, test_plan_id').eq('project_id', projectId),
-        supabase.from('test_run_case_current_status').select('run_id, current_status').eq('project_id', projectId),
+        fetchAllRows(() =>
+          supabase.from('test_run_case_current_status').select('run_id, current_status, run_case_id').eq('project_id', projectId).order('run_case_id')),
         supabase.from('project_members').select('user_id, profiles(id, name)').eq('project_id', projectId),
         user
           ? supabase.from('project_members').select('role').eq('project_id', projectId).eq('user_id', user.id).maybeSingle()
           : Promise.resolve({ data: null }),
+        supabase.from('test_suites').select('id, name').eq('project_id', projectId).order('name'),
       ])
     setProject(proj)
     setPlans(planRows || [])
@@ -70,6 +76,7 @@ export default function VmsTestPlansPage() {
     setStatusRows(statusData || [])
     setMembers((memberRows || []).map((m) => m.profiles).filter(Boolean))
     setMyRole(roleRow?.role || null)
+    setSuites(suiteRows || [])
     setLoading(false)
   }
 
@@ -126,16 +133,24 @@ export default function VmsTestPlansPage() {
         <AppHeader breadcrumb={[{ label: 'Projects', to: '/dashboard' }, { label: project?.name, to: `/project/${projectId}/overview` }, { label: 'VMS Test Plans' }]} />
         <PageHeader
           title="VMS Test Plans"
-          subtitle="Group your test runs into release plans and track VMS-specific scenario coverage"
+          subtitle="Review, maintain and export your VMS test plan"
           actions={
-            canAuthor && (
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => setShowNewPlan(true)}
-                className="flex items-center gap-1.5 bg-blue-500 hover:bg-blue-400 text-white px-3 py-1.5 rounded-md text-[12px] font-semibold"
+                onClick={() => setShowExport(true)}
+                className="flex items-center gap-1.5 border border-gray-700 hover:border-gray-600 text-gray-300 hover:text-white px-3 py-1.5 rounded-md text-[12px] font-semibold"
               >
-                <Plus size={14} /> New Test Plan
+                <Download size={14} /> Export Excel
               </button>
-            )
+              {canAuthor && (
+                <button
+                  onClick={() => setShowNewPlan(true)}
+                  className="flex items-center gap-1.5 bg-blue-500 hover:bg-blue-400 text-white px-3 py-1.5 rounded-md text-[12px] font-semibold"
+                >
+                  <Plus size={14} /> New Test Plan
+                </button>
+              )}
+            </div>
           }
         />
 
@@ -172,7 +187,6 @@ export default function VmsTestPlansPage() {
                   </div>
                 ),
               },
-              { key: 'release_version', label: 'Release', render: (p) => p.release_version || '—' },
               { key: 'status', label: 'Status', render: (p) => <StatusBadge domain={TEST_PLAN_STATUS} value={p.status} /> },
               { key: 'runs', label: 'Runs', render: (p) => runCountForPlan(p.id) },
               {
@@ -198,6 +212,14 @@ export default function VmsTestPlansPage() {
           fetchAll()
           navigate(`/project/${projectId}/plans/${newPlanId}`)
         }}
+      />
+
+      <ExportTestPlanModal
+        open={showExport}
+        onClose={() => setShowExport(false)}
+        projectId={projectId}
+        projectName={project?.name}
+        suites={suites}
       />
     </div>
   )
@@ -290,7 +312,7 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
         <PageHeader
           title={plan.name}
           badge={<StatusBadge domain={TEST_PLAN_STATUS} value={plan.status} />}
-          subtitle={plan.description || `Created by ${plan.creator?.name || 'someone'}${plan.release_version ? ` · Release ${plan.release_version}` : ''}`}
+          subtitle={plan.description || `Created by ${plan.creator?.name || 'someone'}`}
           actions={
             canAuthor && (
               <div className="flex items-center gap-2">

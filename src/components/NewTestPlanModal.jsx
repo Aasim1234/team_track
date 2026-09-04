@@ -13,7 +13,6 @@ export default function NewTestPlanModal({ open, onClose, projectId, members, us
   const isEdit = Boolean(plan)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [releaseVersion, setReleaseVersion] = useState('')
   const [targetDate, setTargetDate] = useState('')
   const [ownerId, setOwnerId] = useState('')
   const [saving, setSaving] = useState(false)
@@ -22,7 +21,6 @@ export default function NewTestPlanModal({ open, onClose, projectId, members, us
     if (open) {
       setName(plan?.name || '')
       setDescription(plan?.description || '')
-      setReleaseVersion(plan?.release_version || '')
       setTargetDate(plan?.target_date || '')
       setOwnerId(plan?.owner_id || '')
     }
@@ -34,7 +32,6 @@ export default function NewTestPlanModal({ open, onClose, projectId, members, us
     const fields = {
       name,
       description: description || null,
-      release_version: releaseVersion || null,
       target_date: targetDate || null,
       owner_id: ownerId || null,
     }
@@ -60,19 +57,14 @@ export default function NewTestPlanModal({ open, onClose, projectId, members, us
     <Modal open={open} onClose={onClose} title={isEdit ? 'Edit Test Plan' : 'New Test Plan'} size="lg">
       <form onSubmit={handleSubmit} className="space-y-3.5">
         <FormField label="Plan name" required>
-          <input value={name} onChange={(e) => setName(e.target.value)} required autoFocus placeholder="e.g. VMS 12.60 Release Validation" className={inputClass} />
+          <input value={name} onChange={(e) => setName(e.target.value)} required autoFocus placeholder="e.g. VMS Regression Test Plan" className={inputClass} />
         </FormField>
         <FormField label="Description">
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="What this plan covers" className={`${inputClass} resize-y`} />
         </FormField>
-        <div className="grid grid-cols-2 gap-3">
-          <FormField label="Release version" hint="e.g. 12.60">
-            <input value={releaseVersion} onChange={(e) => setReleaseVersion(e.target.value)} className={inputClass} />
-          </FormField>
-          <FormField label="Target date">
-            <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className={inputClass} />
-          </FormField>
-        </div>
+        <FormField label="Target date">
+          <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)} className={inputClass} />
+        </FormField>
         <FormField label="Owner">
           <select value={ownerId} onChange={(e) => setOwnerId(e.target.value)} className={inputClass}>
             <option value="">Unassigned</option>
