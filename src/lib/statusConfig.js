@@ -109,3 +109,14 @@ export function resolveStatus(domain, value) {
   if (!entry) return { label: value ?? '—', ...COLOR_MAP.gray }
   return { label: entry.label, ...COLOR_MAP[entry.color] }
 }
+
+// The VMS Test Plan grid's RESULT column. `na` is here because the source
+// sheet uses it; the rest are the five states the plan is reviewed against.
+export const VMS_RESULT = {
+  not_tested: { label: 'Not Tested', color: 'gray' },
+  pass: { label: 'Pass', color: 'green' },
+  fail: { label: 'Fail', color: 'red' },
+  blocked: { label: 'Blocked', color: 'orange' },
+  retest: { label: 'Retest', color: 'purple' },
+  na: { label: 'N/A', color: 'gray' },
+}

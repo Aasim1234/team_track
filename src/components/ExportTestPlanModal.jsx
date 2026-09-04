@@ -7,75 +7,47 @@ import FormField, { inputClass } from './ui/FormField'
 import PrimaryButton from './ui/Button'
 import { useToast } from './ui/Toast'
 import { downloadXlsx, downloadCsv } from '../lib/xlsx'
+import { VMS_RESULT } from '../lib/statusConfig'
 
-// Columns are the export contract — the sheet the user gets back out.
+// The export contract: the same five columns as the source sheet, in the same
+// order, and nothing else.
 const COLUMNS = [
-  { key: 'human_id', label: 'Test Case ID', width: 14 },
-  { key: 'section', label: 'Section', width: 24 },
-  { key: 'subsection', label: 'Subsection', width: 24 },
-  { key: 'title', label: 'Test Case Title', width: 38 },
-  { key: 'objective', label: 'Description', width: 38 },
-  { key: 'preconditions', label: 'Preconditions', width: 30 },
-  { key: 'steps', label: 'Test Steps', width: 46 },
-  { key: 'expected', label: 'Expected Result', width: 40 },
-  { key: 'priority', label: 'Priority', width: 10 },
-  { key: 'test_type', label: 'Type', width: 12 },
-  { key: 'tags', label: 'Tags', width: 18 },
+  { key: 'topic', label: 'Topic', width: 22 },
+  { key: 'scenario', label: 'Scenario', width: 32 },
+  { key: 'test_steps', label: 'Test Steps', width: 58 },
+  { key: 'expected_result', label: 'Expected Result', width: 46 },
+  { key: 'result', label: 'RESULT', width: 12 },
 ]
 
-export default function ExportTestPlanModal({ open, onClose, projectId, projectName, suites }) {
+export default function ExportTestPlanModal({ open, onClose, planId, planName, plans }) {
   const toast = useToast()
   const [filename, setFilename] = useState('')
   const [format, setFormat] = useState('xlsx')
-  const [suiteId, setSuiteId] = useState('all')
+  const [scope, setScope] = useState('current')
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    // Seeded from the project, never from a version — the user owns this field.
-    if (open) setFilename(`${(projectName || 'Test').replace(/\s+/g, '_')}_Test_Plan`)
-  }, [open, projectName])
+    // Seeded from the plan name, never from a version — the user owns this field.
+    if (open) setFilename(`${(planName || 'VMS').replace(/[^\w]+/g, '_')}_Test_Plan`)
+  }, [open, planName])
+
+  const targetPlanId = scope === 'current' ? planId : scope
 
   const buildRows = async () => {
-    const [{ data: sectionRows }, { data: caseRows }, { data: stepRows }] = await Promise.all([
-      fetchAllRows(() => supabase.from('sections').select('id, name, parent_section_id, suite_id, sort_order').eq('project_id', projectId).order('sort_order').order('id')),
-      fetchAllRows(() => supabase.from('test_cases').select('id, human_id, title, objective, preconditions, priority, test_type, tags, section_id').eq('project_id', projectId).order('human_id').order('id')),
-      fetchAllRows(() => supabase.from('test_case_steps').select('test_case_id, step_number, action, expected_result').order('test_case_id').order('step_number')),
-    ])
+    const { data } = await fetchAllRows(() =>
+      supabase
+        .from('vms_test_plan_rows')
+        .select('topic, scenario, test_steps, expected_result, result, sort_order')
+        .eq('plan_id', targetPlanId)
+        .order('sort_order'))
 
-    const sectionById = new Map((sectionRows || []).map((s) => [s.id, s]))
-    const stepsByCase = new Map()
-    for (const step of stepRows || []) {
-      if (!stepsByCase.has(step.test_case_id)) stepsByCase.set(step.test_case_id, [])
-      stepsByCase.get(step.test_case_id).push(step)
-    }
-
-    const wanted = (section) => suiteId === 'all' || section?.suite_id === suiteId
-    const numbered = (list, field) =>
-      list.length === 1 ? list[0][field] || '' : list.map((s, i) => `${i + 1}. ${s[field] || ''}`).join('\n')
-
-    const rows = []
-    for (const c of caseRows || []) {
-      const section = sectionById.get(c.section_id)
-      if (!section || !wanted(section)) continue
-      const parent = section.parent_section_id ? sectionById.get(section.parent_section_id) : null
-      const steps = (stepsByCase.get(c.id) || []).sort((a, b) => a.step_number - b.step_number)
-
-      rows.push({
-        human_id: c.human_id || '',
-        // A child section is the subsection; its parent is the section.
-        section: (parent ? parent.name : section.name).replace(/\s+/g, ' ').trim(),
-        subsection: parent ? section.name.replace(/\s+/g, ' ').trim() : '',
-        title: c.title || '',
-        objective: c.objective || '',
-        preconditions: c.preconditions || '',
-        steps: numbered(steps, 'action'),
-        expected: numbered(steps.filter((s) => s.expected_result), 'expected_result'),
-        priority: c.priority || '',
-        test_type: c.test_type || '',
-        tags: (c.tags || []).join(', '),
-      })
-    }
-    return rows
+    return (data || []).map((r) => ({
+      topic: r.topic || '',
+      scenario: r.scenario || '',
+      test_steps: r.test_steps || '',
+      expected_result: r.expected_result || '',
+      result: VMS_RESULT[r.result]?.label || 'Not Tested',
+    }))
   }
 
   const handleExport = async (e) => {
@@ -87,8 +59,8 @@ export default function ExportTestPlanModal({ open, onClose, projectId, projectN
       const rows = await buildRows()
       if (!rows.length) { toast.error('Nothing to export for that selection'); setBusy(false); return }
       if (format === 'csv') downloadCsv(name, COLUMNS, rows)
-      else downloadXlsx(name, [{ name: 'Test Cases', columns: COLUMNS, rows }])
-      toast.success(`Exported ${rows.length} test case${rows.length === 1 ? '' : 's'}`)
+      else downloadXlsx(name, [{ name: 'Test Plan', columns: COLUMNS, rows }])
+      toast.success(`Exported ${rows.length} row${rows.length === 1 ? '' : 's'}`)
       onClose()
     } catch (err) {
       toast.error(err.message || 'Export failed')
@@ -101,12 +73,14 @@ export default function ExportTestPlanModal({ open, onClose, projectId, projectN
   return (
     <Modal open={open} onClose={onClose} title="Export Test Plan" size="lg">
       <form onSubmit={handleExport} className="space-y-3.5">
-        <FormField label="Test cases to export">
-          <select value={suiteId} onChange={(e) => setSuiteId(e.target.value)} className={inputClass}>
-            <option value="all">All sections</option>
-            {(suites || []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        </FormField>
+        {plans?.length > 1 && (
+          <FormField label="Test plan">
+            <select value={scope} onChange={(e) => setScope(e.target.value)} className={inputClass}>
+              <option value="current">{planName}</option>
+              {plans.filter((p) => p.id !== planId).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </FormField>
+        )}
 
         <FormField label="Format">
           <div className="flex gap-2">

@@ -53,16 +53,23 @@ function sheetXml(columns, rows) {
 
   const body = rows
     .map((row, r) => {
+      let lines = 1
       const cells = columns
         .map((col, c) => {
           const raw = row[col.key]
           if (raw === null || raw === undefined || raw === '') return ''
           const ref = `${columnName(c)}${r + 2}`
-          if (typeof raw === 'number' && Number.isFinite(raw)) return `<c r="${ref}"><v>${raw}</v></c>`
-          return `<c r="${ref}" t="inlineStr"><is><t xml:space="preserve">${escapeXml(raw)}</t></is></c>`
+          if (typeof raw === 'number' && Number.isFinite(raw)) return `<c r="${ref}" s="2"><v>${raw}</v></c>`
+          const text = String(raw)
+          // Multi-line steps need the row tall enough to actually show them.
+          const wrapped = text.split('\n').reduce(
+            (sum, line) => sum + Math.max(1, Math.ceil(line.length / ((col.width || 22) * 1.05))), 0)
+          if (wrapped > lines) lines = wrapped
+          return `<c r="${ref}" t="inlineStr" s="2"><is><t xml:space="preserve">${escapeXml(text)}</t></is></c>`
         })
         .join('')
-      return `<row r="${r + 2}">${cells}</row>`
+      const height = Math.min(409, Math.max(15, lines * 14))
+      return `<row r="${r + 2}" ht="${height}" customHeight="1">${cells}</row>`
     })
     .join('')
 
@@ -71,7 +78,7 @@ function sheetXml(columns, rows) {
     .join('')
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols>${widths}</cols><sheetData><row r="1">${header}</row>${body}</sheetData></worksheet>`
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${widths}</cols><sheetData><row r="1" ht="22" customHeight="1">${header}</row>${body}</sheetData><autoFilter ref="A1:${columnName(columns.length - 1)}${rows.length + 1}"/></worksheet>`
 }
 
 function buildParts(sheets) {
@@ -112,10 +119,10 @@ function buildParts(sheets) {
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${relTags}<Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
     },
     {
-      // Two formats: plain body text, and a bold wrapped header row.
+      // s="0" default, s="1" blue bold header, s="2" wrapped top-aligned body.
       path: 'xl/styles.xml',
       content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs></styleSheet>`,
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF4472C4"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border/><border><left style="thin"><color rgb="FFD0D7E5"/></left><right style="thin"><color rgb="FFD0D7E5"/></right><top style="thin"><color rgb="FFD0D7E5"/></top><bottom style="thin"><color rgb="FFD0D7E5"/></bottom></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs></styleSheet>`,
     },
     ...sheetEntries,
   ]
