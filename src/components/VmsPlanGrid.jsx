@@ -1,8 +1,9 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { Plus, Trash2, Copy, ChevronUp, ChevronDown, Search, X } from 'lucide-react'
+import { Plus, Trash2, Copy, ChevronUp, ChevronDown, Search, X, MessageSquareWarning } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useToast } from './ui/Toast'
 import { VMS_RESULT } from '../lib/statusConfig'
+import FailCommentModal from './FailCommentModal'
 
 const RESULT_CLASS = {
   pass: 'bg-green-500/10 text-green-400 border-green-500/30',
@@ -41,6 +42,7 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete })
   const [search, setSearch] = useState('')
   const [resultFilter, setResultFilter] = useState('all')
   const [drafts, setDrafts] = useState({})
+  const [failFor, setFailFor] = useState(null)   // { row, existing } | null
 
   const fetchRows = async () => {
     const { data, error } = await supabase
@@ -76,10 +78,38 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete })
     if (error) { toast.error(error.message); fetchRows() }
   }
 
+  // Failing a case needs a reason first, so nothing is written — and the
+  // dropdown is not moved — until the dialog is confirmed. Cancelling leaves
+  // the previous result exactly as it was.
   const setResult = async (row, result) => {
-    setRows((rs) => rs.map((r) => (r.id === row.id ? { ...r, result } : r)))
+    if (result === 'fail') { setFailFor({ row, existing: null }); return }
+
+    setRows((rs) => rs.map((r) => (r.id === row.id ? { ...r, result, failure_comment: null } : r)))
     const { error } = await supabase.from('vms_test_plan_rows').update({ result }).eq('id', row.id)
     if (error) { toast.error(error.message); fetchRows() }
+  }
+
+  const confirmFail = async (comment) => {
+    const row = failFor?.row
+    if (!row) return false
+    const { data, error } = await supabase
+      .from('vms_test_plan_rows')
+      .update({ result: 'fail', failure_comment: comment })
+      .eq('id', row.id)
+      .select('id, result, failure_comment, failed_at')
+      .single()
+
+    if (error) {
+      // The database enforces this too; surface its refusal rather than
+      // pretending the save worked.
+      toast.error(
+        error.message?.includes('vms_rows_fail_needs_comment')
+          ? 'A failure reason is required when marking a test case as Failed.'
+          : error.message)
+      return false
+    }
+    setRows((rs) => rs.map((r) => (r.id === row.id ? { ...r, ...data } : r)))
+    return true
   }
 
   const addRow = async (afterRow) => {
@@ -257,6 +287,16 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete })
                         <option key={key} value={key} className="bg-gray-800 text-gray-200">{cfg.label}</option>
                       ))}
                     </select>
+                    {row.result === 'fail' && (
+                      <button
+                        onClick={() => setFailFor({ row, existing: row.failure_comment || '' })}
+                        title={row.failure_comment || ''}
+                        className="mt-1 flex items-start gap-1 text-left text-[10px] text-gray-400 hover:text-gray-200 w-full"
+                      >
+                        <MessageSquareWarning size={11} className="mt-px flex-shrink-0 text-red-400/70" />
+                        <span className="line-clamp-2">{row.failure_comment || 'Add reason'}</span>
+                      </button>
+                    )}
                   </td>
                   <td className="px-2 py-2">
                     {canAuthor && (
@@ -287,6 +327,14 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete })
       <p className="text-[11px] text-gray-500">
         Showing {filtered.length} of {rows.length} rows. Click any cell to edit — changes save when you click away.
       </p>
+
+      <FailCommentModal
+        open={Boolean(failFor)}
+        onClose={() => setFailFor(null)}
+        row={failFor?.row}
+        existing={failFor?.existing}
+        onConfirm={confirmFail}
+      />
     </div>
   )
 }
