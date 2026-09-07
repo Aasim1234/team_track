@@ -218,6 +218,7 @@ export default function VmsTestPlansPage() {
         planId={plans[0]?.id}
         planName={plans[0]?.name}
         plans={plans}
+        generatedBy={members.find((m) => m.id === user?.id)?.name || user?.email || ''}
       />
     </div>
   )
@@ -432,6 +433,7 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
         onClose={() => setShowExport(false)}
         planId={planId}
         planName={plan.name}
+        generatedBy={members.find((m) => m.id === userId)?.name || ''}
       />
 
       <AddScenarioModal

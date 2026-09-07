@@ -6,7 +6,8 @@ import Modal from './ui/Modal'
 import FormField, { inputClass } from './ui/FormField'
 import PrimaryButton from './ui/Button'
 import { useToast } from './ui/Toast'
-import { downloadXlsx, downloadCsv } from '../lib/xlsx'
+import { downloadCsv } from '../lib/xlsx'
+import { downloadTestPlanXlsx } from '../lib/testPlanExport'
 import { VMS_RESULT } from '../lib/statusConfig'
 
 // The export contract: the same five columns as the source sheet, in the same
@@ -21,7 +22,7 @@ const COLUMNS = [
 
 const FAILURE_COLUMN = { key: 'failure_comment', label: 'Failure Comment', width: 42 }
 
-export default function ExportTestPlanModal({ open, onClose, planId, planName, plans }) {
+export default function ExportTestPlanModal({ open, onClose, planId, planName, plans, generatedBy }) {
   const toast = useToast()
   const [filename, setFilename] = useState('')
   const [format, setFormat] = useState('xlsx')
@@ -64,7 +65,11 @@ export default function ExportTestPlanModal({ open, onClose, planId, planName, p
       if (!rows.length) { toast.error('Nothing to export for that selection'); setBusy(false); return }
       const columns = includeFailureComments ? [...COLUMNS, FAILURE_COLUMN] : COLUMNS
       if (format === 'csv') downloadCsv(name, columns, rows)
-      else downloadXlsx(name, [{ name: 'Test Plan', columns, rows }])
+      else downloadTestPlanXlsx(name, columns, rows, {
+        planName: plans?.find((p) => p.id === targetPlanId)?.name || planName || '',
+        generatedOn: new Date().toLocaleString(),
+        generatedBy: generatedBy || '',
+      })
       toast.success(`Exported ${rows.length} row${rows.length === 1 ? '' : 's'}`)
       onClose()
     } catch (err) {

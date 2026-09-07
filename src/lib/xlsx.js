@@ -17,17 +17,17 @@ const CRC_TABLE = (() => {
   return table
 })()
 
-function crc32(bytes) {
+export function crc32(bytes) {
   let c = 0xffffffff
   for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8)
   return (c ^ 0xffffffff) >>> 0
 }
 
-const utf8 = (str) => new TextEncoder().encode(str)
+export const utf8 = (str) => new TextEncoder().encode(str)
 
 // XML 1.0 forbids most control characters outright — strip them rather than
 // emit a file Excel will refuse to open.
-function escapeXml(value) {
+export function escapeXml(value) {
   return String(value)
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
     .replace(/&/g, '&amp;')
@@ -36,7 +36,7 @@ function escapeXml(value) {
     .replace(/"/g, '&quot;')
 }
 
-function columnName(index) {
+export function columnName(index) {
   let name = ''
   let n = index
   while (n >= 0) {
@@ -129,7 +129,11 @@ function buildParts(sheets) {
 }
 
 export function buildXlsx(sheets) {
-  const parts = buildParts(sheets)
+  return zipParts(buildParts(sheets))
+}
+
+// Packs the OOXML parts into the .xlsx container.
+export function zipParts(parts) {
   const chunks = []
   const central = []
   let offset = 0
@@ -179,7 +183,7 @@ export function buildXlsx(sheets) {
   })
 }
 
-function saveBlob(blob, filename) {
+export function saveBlob(blob, filename) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -190,7 +194,7 @@ function saveBlob(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-const withExtension = (filename, ext) =>
+export const withExtension = (filename, ext) =>
   filename.toLowerCase().endsWith(ext) ? filename : `${filename.replace(/\.(xlsx|csv)$/i, '')}${ext}`
 
 export function downloadXlsx(filename, sheets) {
