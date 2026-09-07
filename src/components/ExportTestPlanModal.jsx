@@ -13,14 +13,14 @@ import { VMS_RESULT } from '../lib/statusConfig'
 // The export contract: the same five columns as the source sheet, in the same
 // order, and nothing else. Failure Comment is opt-in only.
 const COLUMNS = [
-  { key: 'topic', label: 'Topic', width: 22 },
-  { key: 'scenario', label: 'Scenario', width: 32 },
-  { key: 'test_steps', label: 'Test Steps', width: 58 },
-  { key: 'expected_result', label: 'Expected Result', width: 46 },
-  { key: 'result', label: 'RESULT', width: 12 },
+  { key: 'topic', label: 'Topic', width: 25 },
+  { key: 'scenario', label: 'Scenario', width: 40 },
+  { key: 'test_steps', label: 'Test Steps', width: 65 },
+  { key: 'expected_result', label: 'Expected Result', width: 60 },
+  { key: 'result', label: 'RESULT', width: 18 },
 ]
 
-const FAILURE_COLUMN = { key: 'failure_comment', label: 'Failure Comment', width: 42 }
+const FAILURE_COLUMN = { key: 'failure_comment', label: 'Failure Comment', width: 45 }
 
 export default function ExportTestPlanModal({ open, onClose, planId, planName, plans, generatedBy }) {
   const toast = useToast()
