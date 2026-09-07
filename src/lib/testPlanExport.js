@@ -184,10 +184,19 @@ function planSheet(columns, rows, meta, counts) {
       i === 0 ? `COUNTA(${resultRange})` : `COUNTIF(${resultRange},"${STATUSES[i - 1]}")`,
       v, S.METRIC_VALUE)).join('')}</row>`)
 
+  // Pass Rate, plus an N/A box when the plan actually uses that value — without
+  // it the six boxes above would not add up to the total.
   const passRate = rows.length ? counts.Pass / rows.length : 0
-  body.push(`<row r="11" ht="26" customHeight="1">${cellText('A11', 'PASS RATE', S.METRIC_CAPTION)}${
-    cellFormula('B11', `IF(A10=0,0,B10/A10)`, passRate.toFixed(6), S.METRIC_PCT)}${
-    Array.from({ length: width - 2 }, (_, i) => cellText(`${columnName(i + 2)}11`, '', S.VALUE)).join('')}</row>`)
+  const rateRow = [
+    cellText('A11', 'PASS RATE', S.METRIC_CAPTION),
+    cellFormula('B11', `IF(A10=0,0,B10/A10)`, passRate.toFixed(6), S.METRIC_PCT),
+  ]
+  if (counts['N/A']) {
+    rateRow.push(cellText('C11', 'N/A', S.METRIC_CAPTION))
+    rateRow.push(cellFormula('D11', `COUNTIF(${resultRange},"N/A")`, counts['N/A'], S.METRIC_VALUE))
+  }
+  while (rateRow.length < width) rateRow.push(cellText(`${columnName(rateRow.length)}11`, '', S.VALUE))
+  body.push(`<row r="11" ht="26" customHeight="1">${rateRow.join('')}</row>`)
 
   body.push(`<row r="12" ht="7" customHeight="1"/>`)
   body.push(`<row r="13" ht="7" customHeight="1"/>`)
@@ -252,9 +261,16 @@ function summarySheet(rows, meta, counts) {
       v, S.METRIC_VALUE)).join('')}</row>`)
 
   const passRate = rows.length ? counts.Pass / rows.length : 0
-  body.push(`<row r="10" ht="28" customHeight="1">${cellText('A10', 'PASS RATE', S.METRIC_CAPTION)}${
-    cellFormula('B10', `IF(A9=0,0,B9/A9)`, passRate.toFixed(6), S.METRIC_PCT)}${
-    Array.from({ length: 4 }, (_, i) => cellText(`${columnName(i + 2)}10`, '', S.VALUE)).join('')}</row>`)
+  const rateRow = [
+    cellText('A10', 'PASS RATE', S.METRIC_CAPTION),
+    cellFormula('B10', `IF(A9=0,0,B9/A9)`, passRate.toFixed(6), S.METRIC_PCT),
+  ]
+  if (counts['N/A']) {
+    rateRow.push(cellText('C10', 'N/A', S.METRIC_CAPTION))
+    rateRow.push(cellFormula('D10', `COUNTIF(${range},"N/A")`, counts['N/A'], S.METRIC_VALUE))
+  }
+  while (rateRow.length < 6) rateRow.push(cellText(`${columnName(rateRow.length)}10`, '', S.VALUE))
+  body.push(`<row r="10" ht="28" customHeight="1">${rateRow.join('')}</row>`)
 
   const widths = [26, 16, 16, 16, 16, 18]
     .map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')
@@ -276,7 +292,8 @@ const DRAWING_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 // -------------------------------------------------------------- workbook ---
 
 export function buildTestPlanWorkbook(columns, rows, meta) {
-  const counts = Object.fromEntries(STATUSES.map((s) => [s, rows.filter((r) => r.result === s).length]))
+  const counts = Object.fromEntries(
+    [...STATUSES, 'N/A'].map((s) => [s, rows.filter((r) => r.result === s).length]))
   const lastCol = columnName(columns.length - 1)
   const lastData = HEADER_ROW + rows.length
 
