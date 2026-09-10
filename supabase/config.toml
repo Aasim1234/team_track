@@ -1,0 +1,44 @@
+project_id = "uqyqoairmhxxwmplshhu"
+
+# Auth settings for the linked project, pushed with `supabase config push`.
+#
+# The reason this file exists: Supabase's built-in mailer allows only a couple
+# of messages an hour, so onboarding several teammates at once fails with a 429
+# ("email rate limit exceeded"). Access to anything in the app is already gated
+# by project membership — a brand-new account sees an empty app until an admin
+# assigns it a role — so email confirmation buys nothing here and only blocks
+# signup.
+[auth]
+enabled = true
+site_url = "https://team-track-psi.vercel.app"
+additional_redirect_urls = [
+  "https://team-track-psi.vercel.app",
+  "https://team-track-psi.vercel.app/login",
+  "http://localhost:5173",
+]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+enable_anonymous_sign_ins = false
+enable_manual_linking = false
+minimum_password_length = 6
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+# The fix: no confirmation email on signup, so the mailer is never involved.
+enable_confirmations = false
+secure_password_change = false
+max_frequency = "1m0s"
+otp_length = 8
+otp_expiry = 3600
+
+# The CLI pushes storage config too, and its default would try to enable vector
+# buckets (a paid feature) — pinned to the project's actual setting so a future
+# `config push` doesn't fail on a 402.
+[storage]
+enabled = true
+
+[storage.vector]
+enabled = false
