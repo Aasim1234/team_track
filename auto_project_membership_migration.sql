@@ -1,13 +1,15 @@
--- New signups join every project automatically, as Tester.
+-- New signups join every project automatically, as Admin.
 --
 -- Until now a new account got a profile but no project_members row, so RLS hid
 -- everything: the person saw an empty app, and an admin had no sign they had
 -- joined. Now they appear in Project Members straight away and can work.
 --
--- Worth knowing: email confirmation is off on this project, so signups are
--- unverified. Combined with this trigger, anyone who reaches the signup page
--- gets write access to the test repository. Gate signup by email domain if
--- that becomes a concern.
+-- READ THIS BEFORE CHANGING ANYTHING HERE. Email confirmation is off on this
+-- project, so signups are unverified, and this trigger grants Admin — the role
+-- that can delete test cases, suites, runs, results, the project itself, and
+-- other people's roles. Anyone who reaches the signup page gets that. This was
+-- a deliberate choice for a small trusted team on a private URL; if the app is
+-- ever exposed more widely, gate this by email domain or drop back to 'tester'.
 
 
 create or replace function public.handle_new_user()
@@ -25,10 +27,10 @@ begin
   )
   on conflict (id) do nothing;
 
-  -- Join every existing project so the account is visible to admins
-  -- immediately and the person can start work without waiting for approval.
+  -- Join every existing project as admin so the account is visible and usable
+  -- immediately, with no approval step.
   insert into public.project_members (project_id, user_id, role)
-  select p.id, new.id, 'tester'
+  select p.id, new.id, 'admin'
   from public.projects p
   on conflict (project_id, user_id) do nothing;
 
@@ -38,7 +40,7 @@ $function$;
 
 -- Backfill: anyone who already signed up but never got added.
 insert into project_members (project_id, user_id, role)
-select p.id, pr.id, 'tester'
+select p.id, pr.id, 'admin'
 from profiles pr
 cross join projects p
 where not exists (
