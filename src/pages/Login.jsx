@@ -20,6 +20,15 @@ function friendlyError(message) {
   if (lower.includes('provider is not enabled')) {
     return 'This sign-in provider is not enabled yet for this workspace.'
   }
+  // Supabase's built-in mailer allows only a couple of messages an hour, so a
+  // few signups in a row hit this. Say what to do about it rather than echoing
+  // the raw error, which reads like the account was rejected.
+  if (lower.includes('rate limit') || lower.includes('too many requests')) {
+    return 'Too many confirmation emails have been sent from this workspace in the last hour. Ask an admin to create your account directly, or try again later — your details were not saved.'
+  }
+  if (lower.includes('email not confirmed')) {
+    return 'Please confirm your email first — check your inbox for the confirmation link.'
+  }
   return message
 }
 
