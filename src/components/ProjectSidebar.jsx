@@ -136,9 +136,10 @@ export default function ProjectSidebar() {
           <div className="flex items-center justify-between mb-1.5">
             <button
               onClick={() => navigate('/dashboard')}
-              className="flex items-center gap-1 text-gray-500 hover:text-white text-[11px] font-medium"
+              title="Back to all projects"
+              className="flex items-center gap-1.5 -ml-1.5 px-1.5 py-1 rounded-md text-gray-200 hover:text-white hover:bg-gray-650 text-[12px] font-semibold"
             >
-              <ArrowLeft size={12} />
+              <ArrowLeft size={14} strokeWidth={2.25} />
               {!collapsed && 'All Projects'}
             </button>
             <button
