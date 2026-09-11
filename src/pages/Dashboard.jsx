@@ -115,7 +115,7 @@ export default function Dashboard() {
     ] = await Promise.all([
       supabase.from('projects').select('*').order('created_at', { ascending: false }),
       supabase.from('issues').select('id, project_id, title, type, status, priority, assignee_id, due_date, created_at, sprint_id'),
-      fetchAllRows(() => supabase.from('test_cases').select('id, project_id, automation_status').order('id')),
+      fetchAllRows(() => supabase.from('test_cases').select('id, project_id').order('id')),
       supabase.from('test_runs').select('id, project_id, status'),
       fetchAllRows(() => supabase.from('test_run_case_current_status').select('run_case_id, test_case_id, current_status, last_executed_at').order('run_case_id')),
       fetchAllRows(() => supabase.from('test_results').select('id, executed_at').order('id')),
@@ -159,7 +159,6 @@ export default function Dashboard() {
   // Test metrics come from the shared module, so this page, Test Coverage and
   // Reports always agree on what "test cases" and "pass rate" mean.
   const caseSummary = useMemo(() => summarizeCases(testCases, statusRows), [testCases, statusRows])
-  const automatedCount = testCases.filter((c) => c.automation_status === 'automated').length
   const activeRuns = testRuns.filter((r) => r.status === 'active').length
 
   const executionTrend = useMemo(() => {
@@ -302,8 +301,7 @@ export default function Dashboard() {
                 </div>
               )}
               <p className="text-[12px] text-gray-400 mt-4 pt-3 border-t border-gray-750">
-                Each test case counted once, at its latest result · Automation coverage:{' '}
-                <span className="text-white font-semibold">{pctLabel(automatedCount, testCases.length)}</span>
+                Each test case counted once, at its latest result
               </p>
             </BentoCard>
           </div>

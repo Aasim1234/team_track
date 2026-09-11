@@ -14,6 +14,10 @@ const RESULT_CLASS = {
   not_tested: 'bg-gray-700/40 text-gray-400 border-gray-600/40',
 }
 
+// Results that cannot be recorded without a reason.
+const REASON_RESULTS = ['fail', 'blocked']
+const REASON_ICON_CLASS = { fail: 'text-red-400/70', blocked: 'text-orange-400/70' }
+
 // The fields a row's Edit button unlocks. RESULT is deliberately not one of
 // them — recording a result has to stay a single click.
 const EDITABLE = ['topic', 'scenario', 'test_steps', 'expected_result']
@@ -54,7 +58,10 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete, c
   const [search, setSearch] = useState('')
   const [resultFilter, setResultFilter] = useState('all')
   const [assignFilter, setAssignFilter] = useState('all')
-  const [failFor, setFailFor] = useState(null)   // { row, existing } | null
+  const [reasonFor, setReasonFor] = useState(null)   // { row, status, existing } | null
+  // Kept after close so the dialog doesn't switch colours while it animates out.
+  const reasonStatusRef = useRef('fail')
+  if (reasonFor) reasonStatusRef.current = reasonFor.status
 
   // Rows are read-only until their Edit button is clicked; one row at a time.
   const [editingId, setEditingId] = useState(null)
@@ -144,23 +151,23 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete, c
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); saveEdit() }
   }
 
-  // Failing a case needs a reason first, so nothing is written — and the
-  // dropdown is not moved — until the dialog is confirmed. Cancelling leaves
-  // the previous result exactly as it was.
+  // Failing or blocking a case needs a reason first, so nothing is written —
+  // and the dropdown is not moved — until the dialog is confirmed. Cancelling
+  // leaves the previous result exactly as it was.
   const setResult = async (row, result) => {
-    if (result === 'fail') { setFailFor({ row, existing: null }); return }
+    if (REASON_RESULTS.includes(result)) { setReasonFor({ row, status: result, existing: null }); return }
 
     applyRow(row.id, { result, failure_comment: null })
     const { error } = await supabase.from('vms_test_plan_rows').update({ result }).eq('id', row.id)
     if (error) { toast.error(error.message); fetchRows() }
   }
 
-  const confirmFail = async (comment) => {
-    const row = failFor?.row
+  const confirmReason = async (comment) => {
+    const row = reasonFor?.row
     if (!row) return false
     const { data, error } = await supabase
       .from('vms_test_plan_rows')
-      .update({ result: 'fail', failure_comment: comment })
+      .update({ result: reasonFor.status, failure_comment: comment })
       .eq('id', row.id)
       .select('id, result, failure_comment, failed_at')
       .single()
@@ -464,19 +471,19 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete, c
                         <option key={key} value={key} className="bg-gray-800 text-gray-200">{cfg.label}</option>
                       ))}
                     </select>
-                    {row.result === 'fail' && (
+                    {REASON_RESULTS.includes(row.result) && (
                       canUpdate ? (
                         <button
-                          onClick={() => setFailFor({ row, existing: row.failure_comment || '' })}
+                          onClick={() => setReasonFor({ row, status: row.result, existing: row.failure_comment || '' })}
                           title={row.failure_comment || ''}
                           className="mt-0.5 flex items-start gap-1 text-left text-[10px] text-gray-400 hover:text-gray-200 w-full"
                         >
-                          <MessageSquareWarning size={11} className="mt-px flex-shrink-0 text-red-400/70" />
+                          <MessageSquareWarning size={11} className={`mt-px flex-shrink-0 ${REASON_ICON_CLASS[row.result]}`} />
                           <span className="line-clamp-2">{row.failure_comment || 'Add reason'}</span>
                         </button>
                       ) : (
                         <div title={row.failure_comment || ''} className="mt-0.5 flex items-start gap-1 text-[10px] text-gray-400 w-full">
-                          <MessageSquareWarning size={11} className="mt-px flex-shrink-0 text-red-400/70" />
+                          <MessageSquareWarning size={11} className={`mt-px flex-shrink-0 ${REASON_ICON_CLASS[row.result]}`} />
                           <span className="line-clamp-2">{row.failure_comment || '—'}</span>
                         </div>
                       )
@@ -547,11 +554,12 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete, c
       </p>
 
       <FailCommentModal
-        open={Boolean(failFor)}
-        onClose={() => setFailFor(null)}
-        row={failFor?.row}
-        existing={failFor?.existing}
-        onConfirm={confirmFail}
+        open={Boolean(reasonFor)}
+        onClose={() => setReasonFor(null)}
+        row={reasonFor?.row}
+        existing={reasonFor?.existing}
+        status={reasonStatusRef.current}
+        onConfirm={confirmReason}
       />
     </div>
   )

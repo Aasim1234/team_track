@@ -9,7 +9,7 @@ import StatusBadge from '../components/ui/StatusBadge'
 import StatusProgressBar from '../components/ui/StatusProgressBar'
 import EmptyState from '../components/ui/EmptyState'
 import StatCard from '../components/ui/StatCard'
-import { TEST_CASE_PRIORITY, AUTOMATION_STATUS, PROJECT_MEMBER_ROLE } from '../lib/statusConfig'
+import { TEST_CASE_PRIORITY, PROJECT_MEMBER_ROLE } from '../lib/statusConfig'
 
 export default function ProjectOverviewPage() {
   const { id } = useParams()
@@ -30,7 +30,7 @@ export default function ProjectOverviewPage() {
           supabase.from('sections').select('id', { count: 'exact', head: true }).eq('project_id', id),
           supabase
             .from('test_cases')
-            .select('id, human_id, title, test_type, priority, automation_status, owner_id, created_at')
+            .select('id, human_id, title, test_type, priority, owner_id, created_at')
             .eq('project_id', id)
             .order('created_at', { ascending: false }),
           supabase.from('project_members').select('user_id, role, profiles(name, email)').eq('project_id', id),
@@ -106,21 +106,6 @@ export default function ProjectOverviewPage() {
                 <div>
                   <p className="text-[13px] font-semibold text-white mb-3">By priority</p>
                   <StatusProgressBar domain={TEST_CASE_PRIORITY} counts={priorityCounts} showLegend />
-                </div>
-                <div>
-                  <p className="text-[13px] font-semibold text-white mb-3">By automation status</p>
-                  <div className="space-y-1.5">
-                    {Object.keys(AUTOMATION_STATUS).map((key) => {
-                      const count = cases.filter((c) => c.automation_status === key).length
-                      if (!count) return null
-                      return (
-                        <div key={key} className="flex items-center justify-between text-[12px]">
-                          <StatusBadge domain={AUTOMATION_STATUS} value={key} size="sm" />
-                          <span className="text-gray-500">{count}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
                 </div>
               </div>
 

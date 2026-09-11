@@ -10,7 +10,7 @@ import StatusProgressBar from '../components/ui/StatusProgressBar'
 import EmptyState from '../components/ui/EmptyState'
 import FormField, { inputClass } from '../components/ui/FormField'
 import { TEST_RUN_RESULT, TEST_CASE_PRIORITY, TEST_CASE_TYPE } from '../lib/statusConfig'
-import { summarizeRunCases, formatPercent, formatShare } from '../lib/testMetrics'
+import { summarizeRunCases, formatPercent } from '../lib/testMetrics'
 
 function groupCounts(items, field, domain) {
   const counts = {}
@@ -39,7 +39,7 @@ export default function ReportsPage() {
         supabase.from('projects').select('*').eq('id', projectId).single(),
         supabase.from('test_runs').select('id, name, status').eq('project_id', projectId).order('created_at', { ascending: false }),
         fetchAllRows(() =>
-          supabase.from('test_cases').select('id, human_id, title, priority, test_type, automation_status').eq('project_id', projectId).order('id')),
+          supabase.from('test_cases').select('id, human_id, title, priority, test_type').eq('project_id', projectId).order('id')),
         fetchAllRows(() =>
           supabase.from('test_run_cases').select('test_case_id').eq('project_id', projectId).order('id')),
       ])
@@ -83,7 +83,6 @@ export default function ReportsPage() {
   // This tab is about a single run, so it uses the run-slot view of the shared metrics.
   const { counts, total, executed, passRate } = summarizeRunCases(runRows)
 
-  const automatedCount = cases.filter((c) => c.automation_status === 'automated').length
   const neverExecutedCount = cases.filter((c) => !executedCaseIds.has(c.id)).length
   const priorityCounts = groupCounts(cases, 'priority', TEST_CASE_PRIORITY)
   const typeCounts = groupCounts(cases, 'test_type', TEST_CASE_TYPE)
@@ -140,11 +139,7 @@ export default function ReportsPage() {
             cases.length === 0 ? (
               <EmptyState icon={BarChart3} title="No test cases yet" description="Add test cases to your repository to see coverage reports." />
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="border border-gray-600 rounded-lg p-4">
-                  <p className="text-2xl font-bold text-white">{formatShare(automatedCount, cases.length)}</p>
-                  <p className="text-[12px] text-gray-500 mt-0.5">Automation coverage ({automatedCount}/{cases.length} cases)</p>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="border border-gray-600 rounded-lg p-4">
                   <p className="text-2xl font-bold text-white">{cases.length}</p>
                   <p className="text-[12px] text-gray-500 mt-0.5">Test cases in this project</p>
@@ -154,11 +149,11 @@ export default function ReportsPage() {
                   <p className="text-[12px] text-gray-500 mt-0.5">Not in any run</p>
                 </div>
 
-                <div className="border border-gray-600 rounded-lg p-4 md:col-span-3">
+                <div className="border border-gray-600 rounded-lg p-4 md:col-span-2">
                   <p className="text-[13px] font-semibold text-white mb-3">By Priority</p>
                   <StatusProgressBar domain={TEST_CASE_PRIORITY} counts={priorityCounts} showLegend />
                 </div>
-                <div className="border border-gray-600 rounded-lg p-4 md:col-span-3">
+                <div className="border border-gray-600 rounded-lg p-4 md:col-span-2">
                   <p className="text-[13px] font-semibold text-white mb-3">By Type</p>
                   <StatusProgressBar domain={TEST_CASE_TYPE} counts={typeCounts} showLegend />
                 </div>

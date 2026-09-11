@@ -12,7 +12,7 @@ import { VMS_RESULT } from '../lib/statusConfig'
 import { logExport } from '../lib/auditLog'
 
 // The export contract: the same five columns as the source sheet, in the same
-// order, and nothing else. Failure Comment is opt-in only.
+// order, and nothing else. The Fail / Block Reason column is opt-in only.
 const COLUMNS = [
   { key: 'topic', label: 'Topic', width: 25 },
   { key: 'scenario', label: 'Scenario', width: 40 },
@@ -21,7 +21,7 @@ const COLUMNS = [
   { key: 'result', label: 'RESULT', width: 18 },
 ]
 
-const FAILURE_COLUMN = { key: 'failure_comment', label: 'Failure Comment', width: 45 }
+const FAILURE_COLUMN = { key: 'failure_comment', label: 'Fail / Block Reason', width: 45 }
 
 export default function ExportTestPlanModal({ open, onClose, planId, planName, plans, generatedBy }) {
   const toast = useToast()
@@ -52,7 +52,7 @@ export default function ExportTestPlanModal({ open, onClose, planId, planName, p
       test_steps: r.test_steps || '',
       expected_result: r.expected_result || '',
       result: VMS_RESULT[r.result]?.label || 'Not Tested',
-      failure_comment: r.result === 'fail' ? (r.failure_comment || '') : '',
+      failure_comment: ['fail', 'blocked'].includes(r.result) ? (r.failure_comment || '') : '',
     }))
   }
 
@@ -132,9 +132,9 @@ export default function ExportTestPlanModal({ open, onClose, planId, planName, p
             className="mt-0.5 accent-blue-500"
           />
           <span>
-            <span className="block text-[12px] text-gray-200 font-medium">Include Failure Comments</span>
+            <span className="block text-[12px] text-gray-200 font-medium">Include Fail / Block Reasons</span>
             <span className="block text-[11px] text-gray-500">
-              Adds a sixth column with the reason for each failed row. Off by default, so the standard export keeps its five columns.
+              Adds a sixth column with the reason for each failed or blocked row. Off by default, so the standard export keeps its five columns.
             </span>
           </span>
         </label>
