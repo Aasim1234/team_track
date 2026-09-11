@@ -209,8 +209,6 @@ export default function Dashboard() {
     }
   }
 
-  const bugs = issues.filter((i) => i.type === 'bug')
-  const openBugs = bugs.filter((i) => i.status !== 'done').length
   const executed = statusRows.filter((r) => r.current_status !== 'untested').length
   const passed = statusRows.filter((r) => r.current_status === 'passed').length
   const passRate = executed > 0 ? Math.round((passed / executed) * 100) : 0
@@ -227,14 +225,6 @@ export default function Dashboard() {
     }))
   }, [testResults])
 
-  const bugTrend = useMemo(() => {
-    const days = last14Days()
-    return days.map((d) => ({
-      label: d.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' }),
-      value: bugs.filter((b) => { const bd = toDate(b.created_at); return bd && dayKey(bd) === dayKey(d) }).length,
-    }))
-  }, [issues])
-
   const donutEntries = useMemo(() => {
     const counts = {}
     statusRows.forEach((r) => { counts[r.current_status] = (counts[r.current_status] || 0) + 1 })
@@ -247,6 +237,7 @@ export default function Dashboard() {
         label: TEST_RUN_RESULT[key]?.label || key,
       }))
   }, [statusRows])
+  const coverageTotal = donutEntries.reduce((sum, e) => sum + e.count, 0)
 
   const sprintStatus = useMemo(() => {
     return sprints.map((s) => {
@@ -287,7 +278,7 @@ export default function Dashboard() {
         <div className="flex-1 min-w-0 p-6 md:p-8 animate-pulse">
           <div className="h-8 w-64 bg-gray-800 rounded-lg mb-6" />
           <div className="grid grid-cols-12 gap-4 mb-4">
-            {Array.from({ length: 3 }).map((_, i) => <div key={i} className="col-span-12 md:col-span-4 h-40 bg-gray-800 rounded-2xl" />)}
+            {Array.from({ length: 2 }).map((_, i) => <div key={i} className="col-span-12 md:col-span-6 h-40 bg-gray-800 rounded-2xl" />)}
           </div>
           <div className="grid grid-cols-12 gap-4">
             {Array.from({ length: 3 }).map((_, i) => <div key={i} className="col-span-12 md:col-span-4 h-32 bg-gray-800 rounded-2xl" />)}
@@ -327,9 +318,9 @@ export default function Dashboard() {
             <StatCard icon={TrendingUp} label="Pass Rate" value={`${passRate}%`} tint="bg-green-50 text-green-600" />
           </motion.div>
 
-          {/* Row 1 — Execution Trend / Bug Trend / Testing Coverage */}
+          {/* Row 1 — Execution Trend / Testing Coverage */}
           <div className="grid grid-cols-12 gap-4 mb-4">
-            <BentoCard className="col-span-12 md:col-span-5 p-4">
+            <BentoCard className="col-span-12 md:col-span-6 p-4">
               <div className="flex items-center justify-between mb-1">
                 <p className="text-[13px] font-semibold text-white">Execution Trend</p>
                 <span className="text-[11px] text-gray-500">{activeRuns} active runs</span>
@@ -338,33 +329,39 @@ export default function Dashboard() {
               <TrendChart data={executionTrend} color="blue" />
             </BentoCard>
 
-            <BentoCard className="col-span-12 md:col-span-4 p-4">
-              <div className="flex items-center justify-between mb-1">
-                <p className="text-[13px] font-semibold text-white">Bug Trend</p>
-                <span className="text-[11px] text-gray-500">{openBugs} open</span>
+            <BentoCard className="col-span-12 md:col-span-6 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <p className="text-[14px] font-semibold text-white">Testing Coverage</p>
+                <span className="text-[11px] text-gray-500">{coverageTotal.toLocaleString()} executions</span>
               </div>
-              <p className="text-[11px] text-gray-500 mb-3">Bugs reported per day, last 14 days</p>
-              <TrendChart data={bugTrend} color="red" />
-            </BentoCard>
-
-            <BentoCard className="col-span-12 md:col-span-3 p-4">
-              <p className="text-[13px] font-semibold text-white mb-3">Testing Coverage</p>
               {donutEntries.length === 0 ? (
                 <p className="text-[12px] text-gray-500">No test executions recorded yet.</p>
               ) : (
-                <div className="flex items-center gap-3">
-                  <Donut entries={donutEntries} />
-                  <div className="space-y-1 min-w-0">
+                <div className="flex items-center gap-8">
+                  {/* The svg is rotated so segments start at 12 o'clock; the
+                      centre label sits in an overlay so it stays upright. */}
+                  <div className="relative flex-shrink-0">
+                    <Donut entries={donutEntries} size={168} thickness={18} />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-[26px] font-bold text-white leading-none">{passRate}%</span>
+                      <span className="text-[11px] text-gray-400 mt-1">pass rate</span>
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0 space-y-2.5">
                     {donutEntries.map((e) => (
-                      <p key={e.key} className="flex items-center gap-1.5 text-[11px] text-gray-400">
-                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${DONUT_DOT[e.color] || DONUT_DOT.gray}`} />
-                        {e.label} <span className="text-gray-500">({e.count})</span>
-                      </p>
+                      <div key={e.key} className="flex items-center gap-2.5 text-[13px]">
+                        <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${DONUT_DOT[e.color] || DONUT_DOT.gray}`} />
+                        <span className="text-gray-200 flex-1 truncate">{e.label}</span>
+                        <span className="text-white font-semibold tabular-nums">{e.count.toLocaleString()}</span>
+                        <span className="text-gray-500 tabular-nums w-10 text-right">
+                          {coverageTotal ? Math.round((e.count / coverageTotal) * 100) : 0}%
+                        </span>
+                      </div>
                     ))}
                   </div>
                 </div>
               )}
-              <p className="text-[11px] text-gray-500 mt-3 pt-3 border-t border-gray-750">
+              <p className="text-[12px] text-gray-400 mt-4 pt-3 border-t border-gray-750">
                 Automation coverage: <span className="text-white font-semibold">{automationCoverage}%</span>
               </p>
             </BentoCard>
