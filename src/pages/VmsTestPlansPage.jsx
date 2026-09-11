@@ -52,6 +52,8 @@ export default function VmsTestPlansPage() {
 
   const canAuthor = ['admin', 'lead', 'tester'].includes(myRole)
   const canDelete = ['admin', 'lead'].includes(myRole)
+  // Admins and Leads may override someone else's test case assignment.
+  const canManageAssignments = ['admin', 'lead'].includes(myRole)
 
   const fetchAll = async () => {
     const [{ data: proj }, { data: planRows }, { data: runRows }, { data: statusData }, { data: memberRows }, { data: roleRow }] =
@@ -105,6 +107,7 @@ export default function VmsTestPlansPage() {
         members={members}
         canAuthor={canAuthor}
         canDelete={canDelete}
+        canManageAssignments={canManageAssignments}
         userId={user?.id}
         onRefreshList={fetchAll}
       />
@@ -225,7 +228,7 @@ export default function VmsTestPlansPage() {
   )
 }
 
-function TestPlanDetail({ projectId, planId, project, runs, statusRows, members, canAuthor, canDelete, userId, onRefreshList }) {
+function TestPlanDetail({ projectId, planId, project, runs, statusRows, members, canAuthor, canDelete, canManageAssignments, userId, onRefreshList }) {
   const navigate = useNavigate()
   const [showExport, setShowExport] = useState(false)
   const [plan, setPlan] = useState(null)
@@ -410,7 +413,15 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
               <p className="text-[13px] font-semibold text-white">Test Plan</p>
               <span className="text-[11px] text-gray-500">Topic · Scenario · Test Steps · Expected Result · RESULT</span>
             </div>
-            <VmsPlanGrid planId={planId} projectId={projectId} canAuthor={canAuthor} canDelete={canDelete} />
+            <VmsPlanGrid
+              planId={planId}
+              projectId={projectId}
+              canAuthor={canAuthor}
+              canDelete={canDelete}
+              canManageAssignments={canManageAssignments}
+              userId={userId}
+              members={members}
+            />
           </BentoCard>
         </div>
       </div>
