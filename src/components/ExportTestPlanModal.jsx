@@ -51,7 +51,7 @@ export default function ExportTestPlanModal({ open, onClose, planId, planName, p
       scenario: r.scenario || '',
       test_steps: r.test_steps || '',
       expected_result: r.expected_result || '',
-      result: VMS_RESULT[r.result]?.label || 'Not Tested',
+      result: VMS_RESULT[r.result]?.label || 'Untested',
       failure_comment: ['fail', 'blocked'].includes(r.result) ? (r.failure_comment || '') : '',
     }))
   }

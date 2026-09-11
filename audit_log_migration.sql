@@ -69,7 +69,7 @@ grant select on audit_log to authenticated;
 create or replace function audit_result_label(p text)
 returns text language sql immutable as $$
   select case p
-    when 'not_tested' then 'Not Tested' when 'pass' then 'Pass' when 'fail' then 'Fail'
+    when 'not_tested' then 'Untested' when 'pass' then 'Pass' when 'fail' then 'Fail'
     when 'blocked' then 'Blocked' when 'retest' then 'Retest' when 'na' then 'N/A'
     else p end
 $$;

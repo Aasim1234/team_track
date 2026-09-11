@@ -19,7 +19,8 @@ const RESULT_PILL = {
   Blocked: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
   Retest: 'bg-purple-500/10 text-purple-400 border-purple-500/30',
   'N/A': 'bg-gray-500/10 text-gray-400 border-gray-600/40',
-  'Not Tested': 'bg-gray-700/40 text-gray-400 border-gray-600/40',
+  Untested: 'bg-gray-700/40 text-gray-400 border-gray-600/40',
+  'Not Tested': 'bg-gray-700/40 text-gray-400 border-gray-600/40', // entries logged before the rename
 }
 
 // Result values render as the same coloured pills the grid uses; long text

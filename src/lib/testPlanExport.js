@@ -19,9 +19,9 @@ import { escapeXml, columnName, zipParts, saveBlob, withExtension } from './xlsx
 const PLAN_SHEET = 'Test Plan'
 const SUMMARY_SHEET = 'Summary'
 
-const STATUSES = ['Pass', 'Fail', 'Blocked', 'Retest', 'Not Tested']
-const STATUS_HEADING = { Pass: 'PASSED', Fail: 'FAILED', Blocked: 'BLOCKED', Retest: 'RETEST', 'Not Tested': 'NOT TESTED' }
-const STATUS_RGB = { Pass: '2E7D4F', Fail: 'C0392B', Blocked: 'B9770E', Retest: '6B4FA8', 'Not Tested': '7F8C8D' }
+const STATUSES = ['Pass', 'Fail', 'Blocked', 'Retest', 'Untested']
+const STATUS_HEADING = { Pass: 'PASSED', Fail: 'FAILED', Blocked: 'BLOCKED', Retest: 'RETEST', Untested: 'UNTESTED' }
+const STATUS_RGB = { Pass: '2E7D4F', Fail: 'C0392B', Blocked: 'B9770E', Retest: '6B4FA8', Untested: '7F8C8D' }
 
 // ---------------------------------------------------------------- styles ---
 
@@ -36,7 +36,7 @@ const FONTS = [
   { sz: 10, b: 1, color: 'C0392B' },                     // 7 fail
   { sz: 10, b: 1, color: 'B9770E' },                     // 8 blocked
   { sz: 10, b: 1, color: '6B4FA8' },                     // 9 retest
-  { sz: 10, b: 1, color: '7F8C8D' },                     // 10 not tested
+  { sz: 10, b: 1, color: '7F8C8D' },                     // 10 untested
   { sz: 9, b: 1, color: 'FFFFFF' },                      // 11 metric caption
   { sz: 18, b: 1, color: '1F3864' },                     // 12 metric value
   { sz: 10, b: 1, color: '1F3864' },                     // 13 topic
@@ -52,7 +52,7 @@ const FILLS = [
   'FBEAE8',             // 6 fail
   'FDF3E2',             // 7 blocked
   'F0EBF8',             // 8 retest
-  'F0F1F2',             // 9 not tested
+  'F0F1F2',             // 9 untested
   'DDE4F0',             // 10 metric card
 ]
 
