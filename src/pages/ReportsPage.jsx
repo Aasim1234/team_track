@@ -6,8 +6,6 @@ import { fetchAllRows } from '../lib/fetchAllRows'
 import ProjectSidebar from '../components/ProjectSidebar'
 import AppHeader from '../components/AppHeader'
 import PageHeader from '../components/PageHeader'
-import EnterpriseTable from '../components/ui/EnterpriseTable'
-import StatusBadge from '../components/ui/StatusBadge'
 import StatusProgressBar from '../components/ui/StatusProgressBar'
 import EmptyState from '../components/ui/EmptyState'
 import FormField, { inputClass } from '../components/ui/FormField'
@@ -82,10 +80,8 @@ export default function ReportsPage() {
     )
   }
 
-  const caseById = Object.fromEntries(cases.map((c) => [c.id, c]))
   // This tab is about a single run, so it uses the run-slot view of the shared metrics.
   const { counts, total, executed, passRate } = summarizeRunCases(runRows)
-  const failedOrBlocked = runRows.filter((r) => ['failed', 'blocked'].includes(r.current_status))
 
   const automatedCount = cases.filter((c) => c.automation_status === 'automated').length
   const neverExecutedCount = cases.filter((c) => !executedCaseIds.has(c.id)).length
@@ -128,37 +124,13 @@ export default function ReportsPage() {
                 {loadingRun ? (
                   <p className="text-[13px] text-gray-500">Loading…</p>
                 ) : (
-                  <>
-                    <div className="border border-gray-600 rounded-lg p-4 max-w-xl">
-                      <div className="flex justify-between text-[13px] mb-2">
-                        <span className="font-semibold text-white">Progress</span>
-                        <span className="text-gray-500">{executed}/{total} test cases executed in this run · {formatPercent(passRate)} pass rate</span>
-                      </div>
-                      <StatusProgressBar domain={TEST_RUN_RESULT} counts={counts} showLegend />
+                  <div className="border border-gray-600 rounded-lg p-4 max-w-xl">
+                    <div className="flex justify-between text-[13px] mb-2">
+                      <span className="font-semibold text-white">Progress</span>
+                      <span className="text-gray-500">{executed}/{total} test cases executed in this run · {formatPercent(passRate)} pass rate</span>
                     </div>
-
-                    <div>
-                      <p className="text-[13px] font-semibold text-white mb-2">Failed &amp; Blocked Cases</p>
-                      <EnterpriseTable
-                        rows={failedOrBlocked}
-                        rowKey={(r) => r.run_case_id}
-                        emptyState={<EmptyState title="No failed or blocked cases" description="Everything executed so far in this run passed." />}
-                        columns={[
-                          {
-                            key: 'case',
-                            label: 'Case',
-                            render: (r) => (
-                              <div className="flex items-center gap-2">
-                                <span className="text-[11px] font-mono text-blue-500">{caseById[r.test_case_id]?.human_id}</span>
-                                <span className="text-white">{caseById[r.test_case_id]?.title || 'Unknown case'}</span>
-                              </div>
-                            ),
-                          },
-                          { key: 'status', label: 'Status', render: (r) => <StatusBadge domain={TEST_RUN_RESULT} value={r.current_status} /> },
-                        ]}
-                      />
-                    </div>
-                  </>
+                    <StatusProgressBar domain={TEST_RUN_RESULT} counts={counts} showLegend />
+                  </div>
                 )}
               </div>
             )
