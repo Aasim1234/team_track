@@ -389,12 +389,7 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
             <div className="space-y-2">
               {linkedRuns.map((r) => (
                 <div key={r.id} className="flex items-center gap-3 px-3 py-2 border border-gray-600 rounded-md">
-                  <button
-                    onClick={() => navigate(`/project/${projectId}/runs/${r.id}`)}
-                    className="text-[13px] text-white hover:text-blue-400 font-medium flex-shrink-0 truncate max-w-[200px] text-left"
-                  >
-                    {r.name}
-                  </button>
+                  <span className="text-[13px] text-white font-medium flex-shrink-0 truncate max-w-[200px]">{r.name}</span>
                   <StatusBadge domain={RUN_STATUS} value={r.status} size="sm" />
                   <div className="flex-1 min-w-[140px]">
                     <StatusProgressBar domain={TEST_RUN_RESULT} counts={perRunCounts[r.id] || countsFor([])} />

@@ -142,7 +142,6 @@ export default function ReportsPage() {
                       <EnterpriseTable
                         rows={failedOrBlocked}
                         rowKey={(r) => r.run_case_id}
-                        onRowClick={() => navigate(`/project/${projectId}/runs/${selectedRunId}`)}
                         emptyState={<EmptyState title="No failed or blocked cases" description="Everything executed so far in this run passed." />}
                         columns={[
                           {

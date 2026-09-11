@@ -382,13 +382,7 @@ export default function Dashboard() {
               <p className="text-[13px] font-semibold text-white mb-3 flex items-center gap-1.5"><User size={14} /> Assigned to Me</p>
               <div className="space-y-1">
                 {assignedToMe.map((i) => (
-                  <button
-                    key={i.id}
-                    onClick={() => navigate(`/project/${i.project_id}/issue/${i.id}`)}
-                    className="w-full text-left px-2 py-1.5 rounded-md hover:bg-gray-650 text-[12px] truncate"
-                  >
-                    {i.title}
-                  </button>
+                  <p key={i.id} className="px-2 py-1.5 text-[12px] truncate">{i.title}</p>
                 ))}
                 {assignedToMe.length === 0 && <p className="text-[12px] text-gray-500 px-2 py-1">Nothing assigned to you.</p>}
               </div>
@@ -400,16 +394,12 @@ export default function Dashboard() {
                 {upcomingDueDates.map((i) => {
                   const overdue = new Date(i.due_date) < new Date()
                   return (
-                    <button
-                      key={i.id}
-                      onClick={() => navigate(`/project/${i.project_id}/issue/${i.id}`)}
-                      className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-gray-650 text-left"
-                    >
+                    <div key={i.id} className="flex items-center justify-between gap-2 px-2 py-1.5">
                       <span className="text-[12px] truncate">{i.title}</span>
                       <span className={`text-[11px] flex-shrink-0 ${overdue ? 'text-red-500' : 'text-gray-500'}`}>
                         {formatDueDate(i.due_date)}
                       </span>
-                    </button>
+                    </div>
                   )
                 })}
                 {upcomingDueDates.length === 0 && <p className="text-[12px] text-gray-500 px-2 py-1">Nothing due.</p>}

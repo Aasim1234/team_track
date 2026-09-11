@@ -3,8 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Clock, Star, Boxes, Plus,
   PanelLeftClose, PanelLeftOpen, ChevronDown,
-  ArrowLeft, Home, ListChecks, PlayCircle, Flag,
-  BarChart3, CheckSquare, KanbanSquare, ClipboardList,
+  ArrowLeft, Home, BarChart3, CheckSquare, ClipboardList,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
@@ -25,10 +24,7 @@ function projectNavItems(projectId) {
   return [
     { to: `${base}/overview`, label: 'Project Overview', icon: Home },
     { to: `${base}/todo`, label: 'To-Do', icon: CheckSquare },
-    { to: `${base}/cases`, label: 'Test Cases', icon: ListChecks },
-    { to: `${base}/runs`, label: 'Test Runs & Results', icon: PlayCircle },
     { to: `${base}/plans`, label: 'VMS Test Plans', icon: ClipboardList },
-    { to: `${base}/milestones`, label: 'Milestones', icon: Flag },
     { to: `${base}/reports`, label: 'Reports', icon: BarChart3 },
   ]
 }
@@ -192,20 +188,6 @@ export default function ProjectSidebar() {
                 />
               ))}
             </nav>
-            <div className="pt-3 border-t border-gray-600">
-              {!collapsed && (
-                <p className="pl-2.5 pb-1 text-[10px] text-gray-500 uppercase font-semibold tracking-wider">
-                  Classic
-                </p>
-              )}
-              <SidebarNavButton
-                  indicatorId="project-nav-indicator"
-                item={{ to: `/project/${currentProjectId}/classic`, label: 'Kanban / Sprints', icon: KanbanSquare }}
-                collapsed={collapsed}
-                active={pathname.startsWith(`/project/${currentProjectId}/classic`)}
-                onClick={() => navigate(`/project/${currentProjectId}/classic`)}
-              />
-            </div>
           </>
         ) : (
           <nav className="space-y-0.5">

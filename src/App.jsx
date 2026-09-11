@@ -1,21 +1,15 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Flag } from 'lucide-react'
 import { useAuth } from './hooks/useAuth'
 import { useProjectAdminAccess } from './hooks/useProjectAdminAccess'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
-import ProjectBoard from './pages/ProjectBoard'
-import IssueDetailPage from './pages/IssueDetailPage'
 import ProjectOverviewPage from './pages/ProjectOverviewPage'
-import TestCasesPage from './pages/TestCasesPage'
-import TestRunsPage from './pages/TestRunsPage'
 import VmsTestPlansPage from './pages/VmsTestPlansPage'
 import TestCoveragePage from './pages/TestCoveragePage'
 import TodoPage from './pages/TodoPage'
 import ReportsPage from './pages/ReportsPage'
 import CommandPalette from './components/CommandPalette'
-import ComingSoonPage from './components/ComingSoonPage'
 import { ToastProvider } from './components/ui/Toast'
 import AdminOverviewPage from './pages/admin/AdminOverviewPage'
 import AdminProjectsPage from './pages/admin/AdminProjectsPage'
@@ -191,46 +185,6 @@ function AnimatedRoutes() {
           }
         />
         <Route
-          path="/project/:id/cases"
-          element={
-            <ProtectedRoute>
-              <TestCasesPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/project/:id/cases/:caseId"
-          element={
-            <ProtectedRoute>
-              <TestCasesPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/project/:id/runs"
-          element={
-            <ProtectedRoute>
-              <TestRunsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/project/:id/runs/:runId"
-          element={
-            <ProtectedRoute>
-              <TestRunsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/project/:id/runs/:runId/case/:runCaseId"
-          element={
-            <ProtectedRoute>
-              <TestRunsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="/project/:id/plans"
           element={
             <ProtectedRoute>
@@ -247,19 +201,6 @@ function AnimatedRoutes() {
           }
         />
         <Route
-          path="/project/:id/milestones"
-          element={
-            <ProtectedRoute>
-              <ComingSoonPage
-                title="Milestones"
-                description="Track releases and sprints with real progress rollups from linked test runs."
-                icon={Flag}
-                phase="Phase 4"
-              />
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="/project/:id/reports"
           element={
             <ProtectedRoute>
@@ -272,22 +213,6 @@ function AnimatedRoutes() {
           element={
             <ProtectedRoute>
               <TodoPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/project/:id/classic/*"
-          element={
-            <ProtectedRoute>
-              <ProjectBoard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/project/:id/issue/:issueId"
-          element={
-            <ProtectedRoute>
-              <IssueDetailPage />
             </ProtectedRoute>
           }
         />

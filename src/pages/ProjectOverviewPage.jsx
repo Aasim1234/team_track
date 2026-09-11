@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { ListChecks, FolderTree, Users, ArrowUpRight } from 'lucide-react'
+import { useParams } from 'react-router-dom'
+import { ListChecks, FolderTree, Users } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import ProjectSidebar from '../components/ProjectSidebar'
 import AppHeader from '../components/AppHeader'
@@ -13,7 +13,6 @@ import { TEST_CASE_PRIORITY, AUTOMATION_STATUS, PROJECT_MEMBER_ROLE } from '../l
 
 export default function ProjectOverviewPage() {
   const { id } = useParams()
-  const navigate = useNavigate()
   const [project, setProject] = useState(null)
   const [suiteCount, setSuiteCount] = useState(0)
   const [sectionCount, setSectionCount] = useState(0)
@@ -73,8 +72,6 @@ export default function ProjectOverviewPage() {
       <div className="flex-1 min-w-0">
         <AppHeader
           breadcrumb={[{ label: 'Projects', to: '/dashboard' }, { label: project.name }]}
-          onQuickCreate={() => navigate(`/project/${id}/cases`)}
-          quickCreateLabel="New Test Case"
         />
 
         <div className="p-6 md:p-8 max-w-6xl mx-auto">
@@ -100,15 +97,7 @@ export default function ProjectOverviewPage() {
               <EmptyState
                 icon={ListChecks}
                 title="No test cases yet"
-                description="Build your test repository — suites, sections, and cases — to get started."
-                action={
-                  <button
-                    onClick={() => navigate(`/project/${id}/cases`)}
-                    className="bg-blue-500 hover:bg-blue-400 px-4 py-2 rounded-md font-semibold text-[13px] text-white"
-                  >
-                    Go to Test Cases
-                  </button>
-                }
+                description="This project doesn't have any test cases."
               />
             </div>
           ) : (
@@ -139,15 +128,10 @@ export default function ProjectOverviewPage() {
                 <p className="text-[13px] font-semibold text-white mb-3">Recently added test cases</p>
                 <div className="space-y-0.5">
                   {recent.map((c) => (
-                    <button
-                      key={c.id}
-                      onClick={() => navigate(`/project/${id}/cases/${c.id}`)}
-                      className="w-full text-left px-2.5 py-2 rounded-md hover:bg-gray-650 flex items-center gap-2 group"
-                    >
+                    <div key={c.id} className="px-2.5 py-2 flex items-center gap-2">
                       <span className="text-[11px] text-blue-500 font-mono flex-shrink-0">{c.human_id}</span>
                       <span className="text-[13px] flex-1 truncate">{c.title}</span>
-                      <ArrowUpRight size={13} className="text-gray-500 group-hover:text-blue-500 flex-shrink-0" />
-                    </button>
+                    </div>
                   ))}
                 </div>
               </div>

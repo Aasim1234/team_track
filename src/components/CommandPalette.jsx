@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Search, LayoutDashboard, Plus, FolderKanban, CircleDot, CornerDownLeft, ListChecks,
+  Search, LayoutDashboard, Plus, FolderKanban, CornerDownLeft,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
@@ -20,11 +20,8 @@ export default function CommandPalette() {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [projects, setProjects] = useState([])
-  const [issues, setIssues] = useState([])
-  const [testCases, setTestCases] = useState([])
   const [selected, setSelected] = useState(0)
   const inputRef = useRef(null)
-  const debounceRef = useRef(null)
 
   // Global shortcuts
   useEffect(() => {
@@ -48,8 +45,6 @@ export default function CommandPalette() {
   useEffect(() => {
     if (!open) return
     setQuery('')
-    setIssues([])
-    setTestCases([])
     setSelected(0)
     setTimeout(() => inputRef.current?.focus(), 30)
     supabase
@@ -58,27 +53,6 @@ export default function CommandPalette() {
       .order('name')
       .then(({ data }) => setProjects(data || []))
   }, [open])
-
-  // Debounced issue + test case search
-  useEffect(() => {
-    if (!open) return
-    clearTimeout(debounceRef.current)
-    if (query.trim().length < 2) {
-      setIssues([])
-      setTestCases([])
-      return
-    }
-    debounceRef.current = setTimeout(async () => {
-      const q = query.trim()
-      const [{ data: issueRows }, { data: caseRows }] = await Promise.all([
-        supabase.from('issues').select('id, title, project_id, status').ilike('title', `%${q}%`).limit(8),
-        supabase.from('test_cases').select('id, human_id, title, project_id').ilike('title', `%${q}%`).limit(8),
-      ])
-      setIssues(issueRows || [])
-      setTestCases(caseRows || [])
-    }, 180)
-    return () => clearTimeout(debounceRef.current)
-  }, [query, open])
 
   const q = query.trim().toLowerCase()
   const filteredActions = ACTIONS.filter((a) => !q || a.label.toLowerCase().includes(q))
@@ -90,8 +64,6 @@ export default function CommandPalette() {
   const flat = [
     ...filteredActions.map((a) => ({ kind: 'action', item: a })),
     ...filteredProjects.map((p) => ({ kind: 'project', item: p })),
-    ...testCases.map((c) => ({ kind: 'testcase', item: c })),
-    ...issues.map((i) => ({ kind: 'issue', item: i })),
   ]
 
   useEffect(() => {
@@ -106,12 +78,6 @@ export default function CommandPalette() {
       if (entry.kind === 'project') {
         recordRecentProject(entry.item.id)
         navigate(`/project/${entry.item.id}/overview`)
-      }
-      if (entry.kind === 'issue') {
-        navigate(`/project/${entry.item.project_id}/issue/${entry.item.id}`)
-      }
-      if (entry.kind === 'testcase') {
-        navigate(`/project/${entry.item.project_id}/cases/${entry.item.id}`)
       }
     },
     [navigate]
@@ -178,7 +144,7 @@ export default function CommandPalette() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onInputKey}
-            placeholder="Search projects, issues, or type a command..."
+            placeholder="Search projects or type a command..."
             className="flex-1 bg-transparent outline-none text-sm text-white placeholder-gray-500"
           />
           <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-gray-700 border border-gray-600/60 text-gray-400">
@@ -210,40 +176,6 @@ export default function CommandPalette() {
                   <FolderKanban size={15} className="text-blue-400 flex-shrink-0" />,
                   p.name,
                   p.key
-                )
-              )}
-            </>
-          )}
-
-          {testCases.length > 0 && (
-            <>
-              <p className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
-                Test Cases
-              </p>
-              {testCases.map((c) =>
-                renderRow(
-                  'testcase',
-                  c,
-                  <ListChecks size={15} className="text-blue-400 flex-shrink-0" />,
-                  c.title,
-                  c.human_id
-                )
-              )}
-            </>
-          )}
-
-          {issues.length > 0 && (
-            <>
-              <p className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wider text-gray-500 font-semibold">
-                Issues
-              </p>
-              {issues.map((i) =>
-                renderRow(
-                  'issue',
-                  i,
-                  <CircleDot size={15} className="text-green-400 flex-shrink-0" />,
-                  i.title,
-                  i.status?.replace('_', ' ')
                 )
               )}
             </>

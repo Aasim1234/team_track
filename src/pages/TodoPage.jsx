@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { CheckSquare, ListChecks } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
@@ -17,7 +17,6 @@ function isOverdue(dueDate) {
 
 export default function TodoPage() {
   const { id: projectId } = useParams()
-  const navigate = useNavigate()
   const { user } = useAuth()
 
   const [project, setProject] = useState(null)
@@ -94,12 +93,11 @@ export default function TodoPage() {
             <EnterpriseTable
               rows={tasks}
               rowKey={(t) => t.id}
-              onRowClick={(t) => navigate(`/project/${projectId}/issue/${t.id}`)}
               emptyState={
                 <EmptyState
                   icon={ListChecks}
                   title="No open tasks assigned to you"
-                  description="Issues assigned to you in this project's Classic board will show up here."
+                  description="Issues assigned to you in this project will show up here."
                 />
               }
               columns={[
@@ -129,7 +127,6 @@ export default function TodoPage() {
             <EnterpriseTable
               rows={rows}
               rowKey={(r) => r.run_case_id}
-              onRowClick={(r) => navigate(`/project/${projectId}/runs/${r.run_id}`)}
               emptyState={
                 <EmptyState
                   icon={CheckSquare}

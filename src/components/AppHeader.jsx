@@ -98,7 +98,7 @@ export default function AppHeader({ breadcrumb = [], onQuickCreate, quickCreateL
           className="flex items-center gap-2 w-full max-w-md px-3 py-1.5 rounded-md bg-gray-700 border border-gray-600 shadow-xs hover:border-gray-500 hover:bg-gray-650 transition-colors duration-150 text-gray-500 text-[13px]"
         >
           <Search size={14} />
-          <span className="flex-1 text-left">Search projects, test cases, issues…</span>
+          <span className="flex-1 text-left">Search projects…</span>
           <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 border border-gray-600 text-gray-500 font-sans">
             Ctrl K
           </kbd>
