@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  FolderKanban, ListChecks, PlayCircle, TrendingUp, Gauge, Bug, AlertTriangle,
-  Clock, ArrowUpRight, User, Activity as ActivityIcon, Star, Sparkles,
+  FolderKanban, ListChecks, PlayCircle, TrendingUp,
+  ArrowUpRight, User, Activity as ActivityIcon, Star, Sparkles,
   CalendarClock, UserPlus, RefreshCw, MessageSquare, Bell, Rocket,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
@@ -211,8 +211,6 @@ export default function Dashboard() {
 
   const bugs = issues.filter((i) => i.type === 'bug')
   const openBugs = bugs.filter((i) => i.status !== 'done').length
-  const urgentBugs = bugs.filter((i) => i.status !== 'done' && i.priority === 'urgent').length
-  const overdueTasks = issues.filter((i) => i.due_date && new Date(i.due_date) < new Date() && i.status !== 'done').length
   const executed = statusRows.filter((r) => r.current_status !== 'untested').length
   const passed = statusRows.filter((r) => r.current_status === 'passed').length
   const passRate = executed > 0 ? Math.round((passed / executed) * 100) : 0
@@ -327,10 +325,6 @@ export default function Dashboard() {
             <StatCard icon={ListChecks} label="Test Cases" value={testCases.length} tint="bg-gray-100 text-gray-600" />
             <StatCard icon={PlayCircle} label="Active Test Runs" value={activeRuns} tint="bg-blue-50 text-blue-600" />
             <StatCard icon={TrendingUp} label="Pass Rate" value={`${passRate}%`} tint="bg-green-50 text-green-600" />
-            <StatCard icon={Gauge} label="Automation Coverage" value={`${automationCoverage}%`} tint="bg-purple-50 text-purple-600" />
-            <StatCard icon={Bug} label="Open Bugs" value={openBugs} tint="bg-orange-50 text-orange-600" />
-            <StatCard icon={AlertTriangle} label="Urgent Bugs" value={urgentBugs} tint="bg-red-50 text-red-600" />
-            <StatCard icon={Clock} label="Overdue Tasks" value={overdueTasks} tint="bg-red-50 text-red-600" />
           </motion.div>
 
           {/* Row 1 — Execution Trend / Bug Trend / Testing Coverage */}
