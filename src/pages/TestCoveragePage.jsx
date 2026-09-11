@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, ClipboardCheck, CheckCircle2, XCircle, CircleDashed, PieChart } from 'lucide-react'
+import { ArrowLeft, ListChecks, PlayCircle, XCircle, CircleDashed, PieChart } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { fetchAllRows } from '../lib/fetchAllRows'
 import ProjectSidebar from '../components/ProjectSidebar'
@@ -11,21 +11,26 @@ import BentoCard from '../components/ui/BentoCard'
 import EmptyState from '../components/ui/EmptyState'
 import { staggerContainer } from '../lib/motion'
 import {
-  ChartCard, StackedBars, Donut, Legend, DataTable,
-  STATUS_SERIES, fmt, pctLabel,
+  ChartCard, StackedBars, Donut, Legend, DataTable, Swatch,
+  CASE_SERIES, fmt, pctLabel,
 } from '../components/charts/CoverageCharts'
+import { summarizeCases, formatPercent, NOT_IN_RUN } from '../lib/testMetrics'
 
 const PRIORITY_ORDER = ['critical', 'high', 'medium', 'low']
 
-const blankCounts = () => Object.fromEntries(STATUS_SERIES.map((s) => [s.key, 0]))
+const countsFor = (series) => Object.fromEntries(series.map((s) => [s.key, 0]))
 
-// "82.6% of 87" — the share of a group's run cases that have been executed.
-const executedLabel = (row) => (
-  <>
-    <span className="text-white font-medium">{pctLabel(row.total - row.counts.untested, row.total)}</span>
-    <span className="text-gray-500"> of {fmt(row.total)}</span>
-  </>
-)
+// "82.6% of 87": the share of a group's test cases that have a recorded result
+// (neither untested nor outside every run).
+const executedLabel = (row) => {
+  const executed = row.total - (row.counts.untested || 0) - (row.counts[NOT_IN_RUN] || 0)
+  return (
+    <>
+      <span className="text-white font-medium">{pctLabel(executed, row.total)}</span>
+      <span className="text-gray-500"> of {fmt(row.total)}</span>
+    </>
+  )
+}
 
 export default function TestCoveragePage() {
   const navigate = useNavigate()
@@ -38,9 +43,11 @@ export default function TestCoveragePage() {
     const load = async () => {
       const results = await Promise.all([
         supabase.from('projects').select('id, name').order('name'),
-        supabase.from('test_runs').select('id, name, project_id'),
         fetchAllRows(() =>
-          supabase.from('test_run_case_current_status').select('run_case_id, run_id, test_case_id, project_id, current_status').order('run_case_id')),
+          supabase
+            .from('test_run_case_current_status')
+            .select('run_case_id, test_case_id, project_id, current_status, last_executed_at')
+            .order('run_case_id')),
         fetchAllRows(() =>
           supabase.from('test_cases').select('id, project_id, priority, section_id').order('id')),
         fetchAllRows(() => supabase.from('sections').select('id, suite_id').order('id')),
@@ -48,8 +55,8 @@ export default function TestCoveragePage() {
       ])
       const failed = results.find((r) => r.error)
       if (failed) { setError(failed.error.message); return }
-      const [projects, runs, statusRows, cases, sections, suites] = results.map((r) => r.data || [])
-      setData({ projects, runs, statusRows, cases, sections, suites })
+      const [projects, statusRows, cases, sections, suites] = results.map((r) => r.data || [])
+      setData({ projects, statusRows, cases, sections, suites })
     }
     load()
   }, [])
@@ -57,49 +64,46 @@ export default function TestCoveragePage() {
   const view = useMemo(() => {
     if (!data) return null
     const inScope = (p) => projectId === 'all' || p === projectId
+    const cases = data.cases.filter((c) => inScope(c.project_id))
+    const statusRows = data.statusRows.filter((r) => inScope(r.project_id))
 
-    const rows = data.statusRows.filter((r) => inScope(r.project_id) && r.current_status in blankCounts())
-    const caseById = new Map(data.cases.map((c) => [c.id, c]))
+    // Test-case view — the same calculation the Dashboard and Reports use.
+    const summary = summarizeCases(cases, statusRows)
+
     const suiteBySection = new Map(data.sections.map((s) => [s.id, s.suite_id]))
     const suiteName = new Map(data.suites.map((s) => [s.id, s.name]))
-    const runName = new Map(data.runs.map((r) => [r.id, r.name]))
 
-    const group = (keyOf, labelOf) => {
+    const group = (items, series, keyOf, labelOf, statusOf) => {
       const groups = new Map()
-      for (const r of rows) {
-        const key = keyOf(r)
+      for (const item of items) {
+        const key = keyOf(item)
         if (key == null) continue
-        if (!groups.has(key)) groups.set(key, { id: key, label: labelOf(key), counts: blankCounts(), total: 0 })
+        const status = statusOf(item)
+        if (!(status in countsFor(series))) continue
+        if (!groups.has(key)) groups.set(key, { id: key, label: labelOf(key), counts: countsFor(series), total: 0 })
         const g = groups.get(key)
-        g.counts[r.current_status]++
+        g.counts[status]++
         g.total++
       }
       return [...groups.values()]
     }
 
-    const overall = blankCounts()
-    rows.forEach((r) => { overall[r.current_status]++ })
-    const total = rows.length
-    const executed = total - overall.untested
-
-    const byRun = group((r) => r.run_id, (id) => runName.get(id) || 'Unknown run')
-      .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
     const bySuite = group(
-      (r) => suiteBySection.get(caseById.get(r.test_case_id)?.section_id),
+      cases, CASE_SERIES,
+      (c) => suiteBySection.get(c.section_id),
       (id) => suiteName.get(id) || 'Unknown suite',
+      (c) => summary.statusOf(c.id),
     ).sort((a, b) => b.total - a.total)
+
     const rank = (k) => { const i = PRIORITY_ORDER.indexOf(k); return i === -1 ? 99 : i }
     const byPriority = group(
-      (r) => caseById.get(r.test_case_id)?.priority || 'none',
+      cases, CASE_SERIES,
+      (c) => c.priority || 'none',
       (k) => (k === 'none' ? 'No priority' : k[0].toUpperCase() + k.slice(1)),
+      (c) => summary.statusOf(c.id),
     ).sort((a, b) => rank(a.id) - rank(b.id))
 
-    return {
-      overall, total, executed,
-      passRate: executed ? (overall.passed / executed) * 100 : 0,
-      progress: total ? (executed / total) * 100 : 0,
-      byRun, bySuite, byPriority,
-    }
+    return { summary, bySuite, byPriority }
   }, [data, projectId])
 
   const header = (
@@ -134,7 +138,8 @@ export default function TestCoveragePage() {
     )
   }
 
-  const { overall, total, executed, passRate, progress, byRun, bySuite, byPriority } = view
+  const { summary, bySuite, byPriority } = view
+  const { counts } = summary
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex">
@@ -144,7 +149,7 @@ export default function TestCoveragePage() {
 
         <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
+            <div className="max-w-3xl">
               <button
                 onClick={() => navigate('/dashboard')}
                 className="flex items-center gap-1.5 text-[12px] font-medium text-gray-400 hover:text-white mb-2"
@@ -153,7 +158,8 @@ export default function TestCoveragePage() {
               </button>
               <h2 className="text-2xl font-bold tracking-tight">Test Coverage</h2>
               <p className="text-sm text-gray-400 mt-1">
-                Execution status across {byRun.length} test run{byRun.length === 1 ? '' : 's'} and {bySuite.length} suite{bySuite.length === 1 ? '' : 's'}.
+                Each of your {fmt(summary.total)} test cases is counted once, at its most recent result
+                across all runs: the same figures as the Dashboard.
               </p>
             </div>
             {/* The one filter row: it scopes every figure on the page. */}
@@ -169,22 +175,22 @@ export default function TestCoveragePage() {
             )}
           </div>
 
-          {total === 0 ? (
-            <EmptyState icon={PieChart} title="No test executions yet" description="Once test runs have results, coverage appears here." />
+          {summary.total === 0 ? (
+            <EmptyState icon={PieChart} title="No test cases yet" description="Add test cases and run them to see coverage here." />
           ) : (
             <>
               {/* Headline: pass rate is the one hero figure; tiles carry the rest. */}
               <div className="grid grid-cols-12 gap-4">
                 <BentoCard noHover className="col-span-12 lg:col-span-4 p-5 flex flex-col">
                   <p className="text-[13px] font-semibold text-gray-400">Pass rate</p>
-                  <p className="text-[52px] font-bold text-white leading-none mt-3">{passRate.toFixed(1)}%</p>
+                  <p className="text-[52px] font-bold text-white leading-none mt-3">{formatPercent(summary.passRate)}</p>
                   <p className="text-[12px] text-gray-500 mt-2">
-                    {fmt(overall.passed)} of {fmt(executed)} executed run cases passed
+                    {fmt(counts.passed)} of {fmt(summary.executed)} executed test cases pass at their latest result
                   </p>
                   <div className="mt-auto pt-5">
                     <div className="flex justify-between text-[12px] mb-1.5">
-                      <span className="text-gray-400">Execution progress</span>
-                      <span className="text-white font-semibold">{progress.toFixed(1)}%</span>
+                      <span className="text-gray-400">Executed</span>
+                      <span className="text-white font-semibold">{formatPercent(summary.executedShare)}</span>
                     </div>
                     {/* Meter: the track is a lighter step of the fill's own ramp. */}
                     <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--viz-meter-track)' }}>
@@ -192,11 +198,13 @@ export default function TestCoveragePage() {
                         className="h-full rounded-full"
                         style={{ background: 'var(--viz-meter-fill)' }}
                         initial={{ width: 0 }}
-                        animate={{ width: `${progress}%` }}
+                        animate={{ width: `${summary.executedShare}%` }}
                         transition={{ duration: 0.7, ease: 'easeOut' }}
                       />
                     </div>
-                    <p className="text-[11px] text-gray-500 mt-1.5">{fmt(executed)} of {fmt(total)} run cases executed</p>
+                    <p className="text-[11px] text-gray-500 mt-1.5">
+                      {fmt(summary.executed)} of {fmt(summary.total)} test cases have a recorded result
+                    </p>
                   </div>
                 </BentoCard>
 
@@ -206,31 +214,31 @@ export default function TestCoveragePage() {
                   animate="animate"
                   className="col-span-12 lg:col-span-8 grid grid-cols-2 gap-4"
                 >
-                  <StatCard icon={ClipboardCheck} label="Run cases" value={total} tint="bg-blue-50 text-blue-600" />
-                  <StatCard icon={CheckCircle2} label="Passed" value={overall.passed} tint="bg-green-50 text-green-600" />
-                  <StatCard icon={XCircle} label="Failed" value={overall.failed} tint="bg-red-50 text-red-600" />
-                  <StatCard icon={CircleDashed} label="Untested" value={overall.untested} tint="bg-gray-100 text-gray-600" />
+                  <StatCard icon={ListChecks} label="Test cases" value={summary.total} tint="bg-blue-50 text-blue-600" />
+                  <StatCard icon={PlayCircle} label="Executed (have a result)" value={summary.executed} tint="bg-green-50 text-green-600" />
+                  <StatCard icon={XCircle} label="Failing at latest result" value={counts.failed} tint="bg-red-50 text-red-600" />
+                  <StatCard icon={CircleDashed} label="Not in any run" value={counts[NOT_IN_RUN]} tint="bg-gray-100 text-gray-600" />
                 </motion.div>
               </div>
 
               <div className="grid grid-cols-12 gap-4">
                 <ChartCard
                   className="col-span-12 lg:col-span-5"
-                  title="Status distribution"
-                  subtitle={`${fmt(total)} run cases, all statuses`}
-                  table={<DataTable rows={[{ id: 'all', label: 'All run cases', counts: overall, total }]} series={STATUS_SERIES} firstColumn="Scope" />}
+                  title="Test case status"
+                  subtitle={`${fmt(summary.total)} test cases, latest result each`}
+                  table={<DataTable rows={[{ id: 'all', label: 'All test cases', counts, total: summary.total }]} series={CASE_SERIES} firstColumn="Scope" />}
                 >
                   <div className="flex flex-col sm:flex-row items-center gap-6">
                     <Donut
-                      series={STATUS_SERIES}
-                      counts={overall}
+                      series={CASE_SERIES}
+                      counts={counts}
                       active={activeStatus}
                       onActive={setActiveStatus}
-                      centerValue={fmt(total)}
-                      centerLabel="run cases"
+                      centerValue={fmt(summary.total)}
+                      centerLabel="test cases"
                     />
                     <ul className="flex-1 w-full space-y-0.5">
-                      {STATUS_SERIES.filter((s) => overall[s.key] > 0).map((s) => (
+                      {CASE_SERIES.filter((s) => counts[s.key] > 0).map((s) => (
                         <li key={s.key}>
                           <button
                             onMouseEnter={() => setActiveStatus(s.key)}
@@ -241,10 +249,10 @@ export default function TestCoveragePage() {
                               activeStatus === s.key ? 'bg-gray-650' : ''
                             }`}
                           >
-                            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                            <Swatch series={s} round />
                             <span className="flex-1 text-left text-gray-300">{s.label}</span>
-                            <span className="text-white font-semibold tabular-nums">{fmt(overall[s.key])}</span>
-                            <span className="w-12 text-right text-gray-500 tabular-nums">{pctLabel(overall[s.key], total)}</span>
+                            <span className="text-white font-semibold tabular-nums">{fmt(counts[s.key])}</span>
+                            <span className="w-12 text-right text-gray-500 tabular-nums">{pctLabel(counts[s.key], summary.total)}</span>
                           </button>
                         </li>
                       ))}
@@ -255,37 +263,27 @@ export default function TestCoveragePage() {
                 <ChartCard
                   className="col-span-12 lg:col-span-7"
                   title="Coverage by suite"
-                  subtitle="Status mix of each suite's run cases"
-                  table={<DataTable rows={bySuite} series={STATUS_SERIES} firstColumn="Suite" />}
+                  subtitle="Test cases in each suite, latest result each"
+                  table={<DataTable rows={bySuite} series={CASE_SERIES} firstColumn="Suite" />}
                 >
-                  <Legend series={STATUS_SERIES} totals={overall} />
+                  <Legend series={CASE_SERIES} totals={counts} />
                   <div className="mt-4">
-                    <StackedBars rows={bySuite} series={STATUS_SERIES} valueLabel={executedLabel} headers={['Suite', 'Executed']} />
+                    <StackedBars rows={bySuite} series={CASE_SERIES} valueLabel={executedLabel} headers={['Suite', 'Executed']} />
                   </div>
                 </ChartCard>
               </div>
 
               <ChartCard
-                title="Status by test run"
-                subtitle="Status mix of every test run, side by side"
-                table={<DataTable rows={byRun} series={STATUS_SERIES} firstColumn="Test run" />}
+                title="Coverage by priority"
+                subtitle="Test cases at each priority, latest result each"
+                table={<DataTable rows={byPriority} series={CASE_SERIES} firstColumn="Priority" />}
               >
-                <Legend series={STATUS_SERIES} totals={overall} />
+                <Legend series={CASE_SERIES} totals={counts} />
                 <div className="mt-4">
-                  <StackedBars rows={byRun} series={STATUS_SERIES} valueLabel={executedLabel} headers={['Test run', 'Executed']} />
+                  <StackedBars rows={byPriority} series={CASE_SERIES} valueLabel={executedLabel} headers={['Priority', 'Executed']} />
                 </div>
               </ChartCard>
 
-              <ChartCard
-                title="Coverage by priority"
-                subtitle="Status mix for each test case priority"
-                table={<DataTable rows={byPriority} series={STATUS_SERIES} firstColumn="Priority" />}
-              >
-                <Legend series={STATUS_SERIES} totals={overall} />
-                <div className="mt-4">
-                  <StackedBars rows={byPriority} series={STATUS_SERIES} valueLabel={executedLabel} headers={['Priority', 'Executed']} />
-                </div>
-              </ChartCard>
             </>
           )}
         </div>

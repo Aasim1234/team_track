@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Plus, ArrowLeft, ClipboardList, Link2, Unlink, Trash2, Pencil, Download } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { fetchAllRows } from '../lib/fetchAllRows'
+import { summarizeRunCases, formatPercent } from '../lib/testMetrics'
 import { useAuth } from '../hooks/useAuth'
 import ProjectSidebar from '../components/ProjectSidebar'
 import AppHeader from '../components/AppHeader'
@@ -255,10 +256,11 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
     perRunCounts[row.run_id] = perRunCounts[row.run_id] || countsFor([])
     perRunCounts[row.run_id][row.current_status] = (perRunCounts[row.run_id][row.current_status] || 0) + 1
   })
-  const overallCounts = mergeCounts(linkedRuns.map((r) => perRunCounts[r.id] || countsFor([])))
-  const overallTotal = Object.values(overallCounts).reduce((a, b) => a + b, 0)
-  const overallExecuted = overallTotal - (overallCounts.untested || 0)
-  const passRate = overallExecuted > 0 ? Math.round(((overallCounts.passed || 0) / overallExecuted) * 100) : 0
+  // Scoped to this plan's linked runs, so it uses the run-slot view of the shared metrics.
+  const linkedRunIds = new Set(linkedRuns.map((r) => r.id))
+  const {
+    counts: overallCounts, total: overallTotal, executed: overallExecuted, passRate,
+  } = summarizeRunCases(statusRows.filter((r) => linkedRunIds.has(r.run_id)))
 
   const attachRun = async (runId) => {
     await supabase.from('test_runs').update({ test_plan_id: planId }).eq('id', runId)
@@ -353,7 +355,7 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
           <BentoCard className="p-4">
             <div className="flex items-center justify-between mb-1">
               <p className="text-[13px] font-semibold text-white">Overall Progress</p>
-              <span className="text-[11px] text-gray-500">{overallExecuted}/{overallTotal} executed · {passRate}% pass rate</span>
+              <span className="text-[11px] text-gray-500">{overallExecuted}/{overallTotal} test cases executed across this plan's runs · {formatPercent(passRate)} pass rate</span>
             </div>
             <StatusProgressBar domain={TEST_RUN_RESULT} counts={overallCounts} showLegend height="h-2.5" />
           </BentoCard>

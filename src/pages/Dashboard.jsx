@@ -21,26 +21,9 @@ import ProgressRing from '../components/ui/ProgressRing'
 import StatCard from '../components/ui/StatCard'
 import BentoCard from '../components/ui/BentoCard'
 import EmptyState from '../components/ui/EmptyState'
-import { TEST_RUN_RESULT } from '../lib/statusConfig'
+import { summarizeCases, formatPercent } from '../lib/testMetrics'
+import { Donut, Swatch, CASE_SERIES, fmt, pctLabel } from '../components/charts/CoverageCharts'
 import { fadeInUp, staggerContainer, TRANSITION } from '../lib/motion'
-
-const DONUT_STROKE = {
-  green: 'stroke-green-500',
-  blue: 'stroke-blue-500',
-  red: 'stroke-red-500',
-  orange: 'stroke-orange-500',
-  purple: 'stroke-purple-500',
-  gray: 'stroke-gray-400',
-}
-
-const DONUT_DOT = {
-  green: 'bg-green-500',
-  blue: 'bg-blue-500',
-  red: 'bg-red-500',
-  orange: 'bg-orange-500',
-  purple: 'bg-purple-500',
-  gray: 'bg-gray-400',
-}
 
 const NOTIFICATION_ICON = {
   assigned: UserPlus,
@@ -85,43 +68,6 @@ function formatDueDate(dateStr) {
   const d = toDate(dateStr)
   if (!d) return ''
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
-
-// Small multi-segment donut — no charting dependency, matches the
-// hand-rolled SVG approach used by TrendChart/ProgressRing. Each segment's
-// stroke-dasharray grows in on mount; its dashoffset (fixed) anchors where
-// it starts, so segments never overlap mid-animation.
-function Donut({ entries, size = 100, thickness = 11 }) {
-  const total = entries.reduce((sum, e) => sum + e.count, 0)
-  const r = (size - thickness) / 2
-  const c = 2 * Math.PI * r
-  let cursor = 0
-
-  return (
-    <svg width={size} height={size} className="-rotate-90 flex-shrink-0">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={thickness} className="stroke-gray-750" />
-      {total > 0 && entries.map((e, idx) => {
-        const segLen = (e.count / total) * c
-        const dashoffset = -cursor
-        cursor += segLen
-        return (
-          <motion.circle
-            key={e.key}
-            cx={size / 2}
-            cy={size / 2}
-            r={r}
-            fill="none"
-            strokeWidth={thickness}
-            strokeDashoffset={dashoffset}
-            initial={{ strokeDasharray: `0 ${c}` }}
-            animate={{ strokeDasharray: `${segLen} ${c - segLen}` }}
-            transition={{ duration: 0.5, delay: idx * 0.08, ease: 'easeOut' }}
-            className={DONUT_STROKE[e.color] || DONUT_STROKE.gray}
-          />
-        )
-      })}
-    </svg>
-  )
 }
 
 export default function Dashboard() {
@@ -170,7 +116,7 @@ export default function Dashboard() {
       supabase.from('issues').select('id, project_id, title, type, status, priority, assignee_id, due_date, created_at, sprint_id'),
       fetchAllRows(() => supabase.from('test_cases').select('id, project_id, automation_status').order('id')),
       supabase.from('test_runs').select('id, project_id, status'),
-      fetchAllRows(() => supabase.from('test_run_case_current_status').select('current_status, run_case_id').order('run_case_id')),
+      fetchAllRows(() => supabase.from('test_run_case_current_status').select('run_case_id, test_case_id, current_status, last_executed_at').order('run_case_id')),
       fetchAllRows(() => supabase.from('test_results').select('id, executed_at').order('id')),
       supabase.from('activity_log').select('*, profiles(name)').order('created_at', { ascending: false }).limit(8),
       supabase.from('sprints').select('id, project_id, name, status').eq('status', 'active'),
@@ -209,12 +155,10 @@ export default function Dashboard() {
     }
   }
 
-  const executed = statusRows.filter((r) => r.current_status !== 'untested').length
-  const passed = statusRows.filter((r) => r.current_status === 'passed').length
-  const passRate = executed > 0 ? Math.round((passed / executed) * 100) : 0
-  const automationCoverage = testCases.length > 0
-    ? Math.round((testCases.filter((c) => c.automation_status === 'automated').length / testCases.length) * 100)
-    : 0
+  // Test metrics come from the shared module, so this page, Test Coverage and
+  // Reports always agree on what "test cases" and "pass rate" mean.
+  const caseSummary = useMemo(() => summarizeCases(testCases, statusRows), [testCases, statusRows])
+  const automatedCount = testCases.filter((c) => c.automation_status === 'automated').length
   const activeRuns = testRuns.filter((r) => r.status === 'active').length
 
   const executionTrend = useMemo(() => {
@@ -225,19 +169,6 @@ export default function Dashboard() {
     }))
   }, [testResults])
 
-  const donutEntries = useMemo(() => {
-    const counts = {}
-    statusRows.forEach((r) => { counts[r.current_status] = (counts[r.current_status] || 0) + 1 })
-    return Object.entries(counts)
-      .filter(([, count]) => count > 0)
-      .map(([key, count]) => ({
-        key,
-        count,
-        color: TEST_RUN_RESULT[key]?.color || 'gray',
-        label: TEST_RUN_RESULT[key]?.label || key,
-      }))
-  }, [statusRows])
-  const coverageTotal = donutEntries.reduce((sum, e) => sum + e.count, 0)
 
   const sprintStatus = useMemo(() => {
     return sprints.map((s) => {
@@ -316,7 +247,7 @@ export default function Dashboard() {
             <StatCard icon={FolderKanban} label="Projects" value={projects.length} tint="bg-blue-50 text-blue-600" />
             <StatCard icon={ListChecks} label="Test Cases" value={testCases.length} tint="bg-gray-100 text-gray-600" />
             <StatCard icon={PlayCircle} label="Active Test Runs" value={activeRuns} tint="bg-blue-50 text-blue-600" />
-            <StatCard icon={TrendingUp} label="Pass Rate" value={`${passRate}%`} tint="bg-green-50 text-green-600" />
+            <StatCard icon={TrendingUp} label="Pass Rate" value={formatPercent(caseSummary.passRate)} tint="bg-green-50 text-green-600" />
           </motion.div>
 
           {/* Row 1 — Execution Trend / Testing Coverage */}
@@ -342,38 +273,36 @@ export default function Dashboard() {
               <div className="flex items-center justify-between mb-4">
                 <p className="text-[14px] font-semibold text-white">Testing Coverage</p>
                 <span className="flex items-center gap-1 text-[11px] text-gray-500 group-hover:text-blue-400">
-                  {coverageTotal.toLocaleString()} executions · View details <ArrowUpRight size={12} />
+                  {fmt(caseSummary.total)} test cases · View details <ArrowUpRight size={12} />
                 </span>
               </div>
-              {donutEntries.length === 0 ? (
-                <p className="text-[12px] text-gray-500">No test executions recorded yet.</p>
+              {caseSummary.total === 0 ? (
+                <p className="text-[12px] text-gray-500">No test cases yet.</p>
               ) : (
                 <div className="flex items-center gap-10">
-                  {/* The svg is rotated so segments start at 12 o'clock; the
-                      centre label sits in an overlay so it stays upright. */}
-                  <div className="relative flex-shrink-0">
-                    <Donut entries={donutEntries} size={188} thickness={20} />
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-[30px] font-bold text-white leading-none">{passRate}%</span>
-                      <span className="text-[11px] text-gray-400 mt-1">pass rate</span>
-                    </div>
-                  </div>
-                  <div className="flex-1 min-w-0 max-w-md space-y-3">
-                    {donutEntries.map((e) => (
-                      <div key={e.key} className="flex items-center gap-2.5 text-[13px]">
-                        <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${DONUT_DOT[e.color] || DONUT_DOT.gray}`} />
-                        <span className="text-gray-200 flex-1 truncate">{e.label}</span>
-                        <span className="text-white font-semibold tabular-nums">{e.count.toLocaleString()}</span>
-                        <span className="text-gray-500 tabular-nums w-10 text-right">
-                          {coverageTotal ? Math.round((e.count / coverageTotal) * 100) : 0}%
-                        </span>
+                  <Donut
+                    series={CASE_SERIES}
+                    counts={caseSummary.counts}
+                    size={188}
+                    thickness={20}
+                    centerValue={formatPercent(caseSummary.passRate)}
+                    centerLabel="pass rate"
+                  />
+                  <div className="flex-1 min-w-0 max-w-md space-y-2.5">
+                    {CASE_SERIES.filter((s) => caseSummary.counts[s.key] > 0).map((s) => (
+                      <div key={s.key} className="flex items-center gap-2.5 text-[13px]">
+                        <Swatch series={s} round />
+                        <span className="text-gray-200 flex-1 truncate">{s.label}</span>
+                        <span className="text-white font-semibold tabular-nums">{fmt(caseSummary.counts[s.key])}</span>
+                        <span className="text-gray-500 tabular-nums w-12 text-right">{pctLabel(caseSummary.counts[s.key], caseSummary.total)}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
               <p className="text-[12px] text-gray-400 mt-4 pt-3 border-t border-gray-750">
-                Automation coverage: <span className="text-white font-semibold">{automationCoverage}%</span>
+                Each test case counted once, at its latest result · Automation coverage:{' '}
+                <span className="text-white font-semibold">{pctLabel(automatedCount, testCases.length)}</span>
               </p>
             </BentoCard>
           </div>

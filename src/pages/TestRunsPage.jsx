@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { Plus, ArrowLeft, Lock, Unlock, PlayCircle } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { fetchAllRows } from '../lib/fetchAllRows'
+import { summarizeRunCases, formatPercent } from '../lib/testMetrics'
 import { useAuth } from '../hooks/useAuth'
 import ProjectSidebar from '../components/ProjectSidebar'
 import AppHeader from '../components/AppHeader'
@@ -321,10 +322,8 @@ function TestRunDetail({ projectId, runId, runCaseId, project, cases, members, c
     )
   }
 
-  const counts = countsFor(rows)
-  const total = rows.length
-  const executed = total - (counts.untested || 0)
-  const passRate = executed > 0 ? Math.round(((counts.passed || 0) / executed) * 100) : 0
+  // One run, so this uses the run-slot view of the shared metrics.
+  const { counts, total, executed, passRate } = summarizeRunCases(rows)
 
   return (
     <div className="h-screen bg-gray-900 text-white flex">
@@ -341,7 +340,7 @@ function TestRunDetail({ projectId, runId, runCaseId, project, cases, members, c
         <PageHeader
           title={run.name}
           badge={<StatusBadge domain={RUN_STATUS} value={run.status} />}
-          subtitle={run.description || `Created by ${run.creator?.name || 'someone'} · ${executed}/${total} executed · ${passRate}% pass rate`}
+          subtitle={run.description || `Created by ${run.creator?.name || 'someone'} · ${executed}/${total} test cases executed in this run · ${formatPercent(passRate)} pass rate`}
           actions={
             canAuthor && (
               <button

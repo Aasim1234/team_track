@@ -12,6 +12,7 @@ import StatusProgressBar from '../components/ui/StatusProgressBar'
 import EmptyState from '../components/ui/EmptyState'
 import FormField, { inputClass } from '../components/ui/FormField'
 import { TEST_RUN_RESULT, TEST_CASE_PRIORITY, TEST_CASE_TYPE } from '../lib/statusConfig'
+import { summarizeRunCases, formatPercent, formatShare } from '../lib/testMetrics'
 
 function groupCounts(items, field, domain) {
   const counts = {}
@@ -82,15 +83,11 @@ export default function ReportsPage() {
   }
 
   const caseById = Object.fromEntries(cases.map((c) => [c.id, c]))
-  const counts = { untested: 0, passed: 0, failed: 0, blocked: 0, retest: 0, skipped: 0 }
-  runRows.forEach((r) => { counts[r.current_status] = (counts[r.current_status] || 0) + 1 })
-  const total = runRows.length
-  const executed = total - (counts.untested || 0)
-  const passRate = executed > 0 ? Math.round(((counts.passed || 0) / executed) * 100) : 0
+  // This tab is about a single run, so it uses the run-slot view of the shared metrics.
+  const { counts, total, executed, passRate } = summarizeRunCases(runRows)
   const failedOrBlocked = runRows.filter((r) => ['failed', 'blocked'].includes(r.current_status))
 
   const automatedCount = cases.filter((c) => c.automation_status === 'automated').length
-  const automationCoverage = cases.length > 0 ? Math.round((automatedCount / cases.length) * 100) : 0
   const neverExecutedCount = cases.filter((c) => !executedCaseIds.has(c.id)).length
   const priorityCounts = groupCounts(cases, 'priority', TEST_CASE_PRIORITY)
   const typeCounts = groupCounts(cases, 'test_type', TEST_CASE_TYPE)
@@ -135,7 +132,7 @@ export default function ReportsPage() {
                     <div className="border border-gray-600 rounded-lg p-4 max-w-xl">
                       <div className="flex justify-between text-[13px] mb-2">
                         <span className="font-semibold text-white">Progress</span>
-                        <span className="text-gray-500">{executed}/{total} executed · {passRate}% pass rate</span>
+                        <span className="text-gray-500">{executed}/{total} test cases executed in this run · {formatPercent(passRate)} pass rate</span>
                       </div>
                       <StatusProgressBar domain={TEST_RUN_RESULT} counts={counts} showLegend />
                     </div>
@@ -174,16 +171,16 @@ export default function ReportsPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="border border-gray-600 rounded-lg p-4">
-                  <p className="text-2xl font-bold text-white">{automationCoverage}%</p>
+                  <p className="text-2xl font-bold text-white">{formatShare(automatedCount, cases.length)}</p>
                   <p className="text-[12px] text-gray-500 mt-0.5">Automation coverage ({automatedCount}/{cases.length} cases)</p>
                 </div>
                 <div className="border border-gray-600 rounded-lg p-4">
                   <p className="text-2xl font-bold text-white">{cases.length}</p>
-                  <p className="text-[12px] text-gray-500 mt-0.5">Total test cases</p>
+                  <p className="text-[12px] text-gray-500 mt-0.5">Test cases in this project</p>
                 </div>
                 <div className="border border-gray-600 rounded-lg p-4">
                   <p className="text-2xl font-bold text-white">{neverExecutedCount}</p>
-                  <p className="text-[12px] text-gray-500 mt-0.5">Never included in a test run</p>
+                  <p className="text-[12px] text-gray-500 mt-0.5">Not in any run</p>
                 </div>
 
                 <div className="border border-gray-600 rounded-lg p-4 md:col-span-3">

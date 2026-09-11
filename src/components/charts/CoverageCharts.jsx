@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { motion } from 'framer-motion'
 import BentoCard from '../ui/BentoCard'
+import { formatShare, NOT_IN_RUN } from '../../lib/testMetrics'
 
 // Colour roles live in index.css (--viz-*) so light and dark swap in one place.
 // Test statuses MEAN good/bad, so they wear the status palette rather than
@@ -15,13 +16,27 @@ export const STATUS_SERIES = [
   { key: 'untested', label: 'Untested', color: 'var(--viz-untested)' },
 ]
 
+// For test-case views: the result statuses plus cases that sit in no run at
+// all. That last one is drawn as empty track, because it is the coverage gap.
+export const CASE_SERIES = [
+  ...STATUS_SERIES,
+  { key: NOT_IN_RUN, label: 'Not in any run', color: 'var(--color-gray-750)', hollow: true },
+]
+
 export const fmt = (n) => (n ?? 0).toLocaleString()
 
-export function pctLabel(part, whole) {
-  if (!whole) return '0%'
-  const p = (part / whole) * 100
-  if (p > 0 && p < 0.1) return '<0.1%'
-  return `${p.toFixed(1)}%`
+// Shares use the one app-wide percentage format from testMetrics.
+export const pctLabel = formatShare
+
+// The colour key used by legends and lists. "Not in any run" is an outlined
+// empty swatch, matching how it appears in the charts: as bare track.
+export function Swatch({ series, round = false }) {
+  return (
+    <span
+      className={`w-2.5 h-2.5 flex-shrink-0 ${round ? 'rounded-full' : 'rounded-[3px]'} ${series.hollow ? 'border border-gray-500' : ''}`}
+      style={{ background: series.color }}
+    />
+  )
 }
 
 // Card chrome for every chart: title, subtitle, and a Chart/Table toggle. The
@@ -67,7 +82,7 @@ export function Legend({ series, totals }) {
         .filter((s) => !totals || totals[s.key] > 0)
         .map((s) => (
           <span key={s.key} className="flex items-center gap-1.5 text-[12px] text-gray-400">
-            <span className="w-2.5 h-2.5 rounded-[3px] flex-shrink-0" style={{ background: s.color }} />
+            <Swatch series={s} />
             {s.label}
           </span>
         ))}
@@ -92,7 +107,7 @@ function Tooltip({ tip, series }) {
           .filter((s) => row.counts[s.key] > 0)
           .map((s) => (
             <div key={s.key} className={`flex items-center gap-2 text-[12px] ${focusKey && focusKey !== s.key ? 'opacity-50' : ''}`}>
-              <span className="w-3 h-[2px] rounded-full flex-shrink-0" style={{ background: s.color }} />
+              <span className="w-3 h-[2px] rounded-full flex-shrink-0" style={{ background: s.hollow ? 'var(--color-gray-500)' : s.color }} />
               <span className="text-white font-semibold tabular-nums">{fmt(row.counts[s.key])}</span>
               <span className="text-gray-400 flex-1">{s.label}</span>
               <span className="text-gray-500 tabular-nums">{pctLabel(row.counts[s.key], row.total)}</span>
