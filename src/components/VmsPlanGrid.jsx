@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { Plus, Trash2, Copy, ChevronUp, ChevronDown, Search, X, MessageSquareWarning } from 'lucide-react'
+import { Plus, Trash2, Search, X, MessageSquareWarning } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useToast } from './ui/Toast'
 import { VMS_RESULT } from '../lib/statusConfig'
@@ -132,46 +132,11 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete })
     fetchRows()
   }
 
-  const duplicateRow = async (row) => {
-    await Promise.all(
-      rows.filter((r) => r.sort_order > row.sort_order)
-          .map((r) => supabase.from('vms_test_plan_rows').update({ sort_order: r.sort_order + 1 }).eq('id', r.id)))
-    const { error } = await supabase.from('vms_test_plan_rows').insert({
-      plan_id: planId,
-      project_id: projectId,
-      topic: row.topic,
-      scenario: row.scenario,
-      test_steps: row.test_steps,
-      expected_result: row.expected_result,
-      result: 'not_tested',
-      sort_order: row.sort_order + 1,
-    })
-    if (error) { toast.error(error.message); return }
-    fetchRows()
-  }
-
   const deleteRow = async (row) => {
     if (!confirm('Delete this row?')) return
     const { error } = await supabase.from('vms_test_plan_rows').delete().eq('id', row.id)
     if (error) { toast.error(error.message); return }
     setRows((rs) => rs.filter((r) => r.id !== row.id))
-  }
-
-  // Swaps sort_order with the neighbour in the full (unfiltered) list.
-  const move = async (row, direction) => {
-    const index = rows.findIndex((r) => r.id === row.id)
-    const target = rows[index + direction]
-    if (!target) return
-    setRows((rs) => {
-      const copy = [...rs]
-      copy[index] = target
-      copy[index + direction] = row
-      return copy
-    })
-    await Promise.all([
-      supabase.from('vms_test_plan_rows').update({ sort_order: target.sort_order }).eq('id', row.id),
-      supabase.from('vms_test_plan_rows').update({ sort_order: row.sort_order }).eq('id', target.id),
-    ])
   }
 
   const filtered = useMemo(() => {
@@ -190,7 +155,7 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete })
   }, [rows])
 
   const cellClass =
-    'w-full bg-transparent text-[12px] text-gray-200 leading-[1.5] resize-none outline-none focus:bg-gray-800/60 rounded px-1.5 py-1 whitespace-pre-wrap'
+    'w-full bg-transparent text-[12px] text-gray-200 leading-[1.4] resize-none outline-none focus:bg-gray-800/60 rounded px-1.5 py-0.5 whitespace-pre-wrap block'
 
   if (loading) return <div className="h-40 bg-gray-800/40 rounded-lg animate-pulse" />
 
@@ -237,15 +202,15 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete })
       </div>
 
       <div className="border border-gray-800 rounded-lg overflow-x-auto">
-        <table className="w-full border-collapse min-w-[1100px]">
+        <table className="w-full border-collapse table-fixed min-w-[960px]">
           <thead>
             <tr className="bg-gray-800/80 text-left">
-              {[['Topic', 'w-[150px]'], ['Scenario', 'w-[210px]'], ['Test Steps', ''], ['Expected Result', 'w-[260px]'], ['RESULT', 'w-[110px]']].map(([label, w]) => (
-                <th key={label} className={`${w} px-2 py-2 text-[11px] font-semibold text-gray-300 uppercase tracking-wide border-b border-gray-700`}>
+              {[['Topic', 'w-[13%]'], ['Scenario', 'w-[18%]'], ['Test Steps', 'w-[33%]'], ['Expected Result', 'w-[26%]'], ['RESULT', 'w-[10%]']].map(([label, w]) => (
+                <th key={label} className={`${w} px-2 py-1.5 text-[11px] font-semibold text-gray-300 uppercase tracking-wide border-b border-gray-700`}>
                   {label}
                 </th>
               ))}
-              <th className="w-[92px] px-2 py-2 border-b border-gray-700" />
+              <th className="w-9 py-1.5 border-b border-gray-700" />
             </tr>
           </thead>
           <tbody>
@@ -254,8 +219,8 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete })
               const previous = filtered[i - 1]
               const newTopic = !previous || previous.topic !== row.topic
               return (
-                <tr key={row.id} className={`align-top border-b border-gray-800/70 hover:bg-gray-800/30 ${newTopic ? 'border-t-2 border-t-gray-700' : ''}`}>
-                  <td className="px-1 py-1">
+                <tr key={row.id} className={`align-top border-b border-gray-800/70 hover:bg-gray-800/30 ${newTopic ? 'border-t border-t-gray-700' : ''}`}>
+                  <td className="px-1 py-0.5">
                     {newTopic ? (
                       <AutoTextarea
                         value={valueOf(row, 'topic')}
@@ -264,24 +229,24 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete })
                         className={`${cellClass} font-semibold text-white`}
                       />
                     ) : (
-                      <span className="block px-1.5 py-1 text-[12px] text-gray-600">↳</span>
+                      <span className="block px-1.5 py-0.5 text-[12px] text-gray-600">↳</span>
                     )}
                   </td>
-                  <td className="px-1 py-1">
+                  <td className="px-1 py-0.5">
                     <AutoTextarea value={valueOf(row, 'scenario')} onChange={(v) => setDraft(row.id, 'scenario', v)} onCommit={() => commit(row, 'scenario')} className={cellClass} />
                   </td>
-                  <td className="px-1 py-1">
+                  <td className="px-1 py-0.5">
                     <AutoTextarea value={valueOf(row, 'test_steps')} onChange={(v) => setDraft(row.id, 'test_steps', v)} onCommit={() => commit(row, 'test_steps')} className={`${cellClass} text-gray-300`} />
                   </td>
-                  <td className="px-1 py-1">
+                  <td className="px-1 py-0.5">
                     <AutoTextarea value={valueOf(row, 'expected_result')} onChange={(v) => setDraft(row.id, 'expected_result', v)} onCommit={() => commit(row, 'expected_result')} className={`${cellClass} text-gray-300`} />
                   </td>
-                  <td className="px-2 py-2">
+                  <td className="px-1.5 py-1">
                     <select
                       value={row.result || 'not_tested'}
                       onChange={(e) => setResult(row, e.target.value)}
                       disabled={!canAuthor}
-                      className={`w-full text-[11px] font-semibold rounded-md border px-1.5 py-1 outline-none ${RESULT_CLASS[row.result] || RESULT_CLASS.not_tested}`}
+                      className={`w-full text-[11px] font-semibold rounded-md border px-1.5 py-0.5 outline-none ${RESULT_CLASS[row.result] || RESULT_CLASS.not_tested}`}
                     >
                       {Object.entries(VMS_RESULT).map(([key, cfg]) => (
                         <option key={key} value={key} className="bg-gray-800 text-gray-200">{cfg.label}</option>
@@ -291,23 +256,18 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete })
                       <button
                         onClick={() => setFailFor({ row, existing: row.failure_comment || '' })}
                         title={row.failure_comment || ''}
-                        className="mt-1 flex items-start gap-1 text-left text-[10px] text-gray-400 hover:text-gray-200 w-full"
+                        className="mt-0.5 flex items-start gap-1 text-left text-[10px] text-gray-400 hover:text-gray-200 w-full"
                       >
                         <MessageSquareWarning size={11} className="mt-px flex-shrink-0 text-red-400/70" />
                         <span className="line-clamp-2">{row.failure_comment || 'Add reason'}</span>
                       </button>
                     )}
                   </td>
-                  <td className="px-2 py-2">
-                    {canAuthor && (
-                      <div className="flex items-center gap-0.5 text-gray-500">
-                        <button onClick={() => move(row, -1)} title="Move up" className="p-1 hover:text-gray-200"><ChevronUp size={13} /></button>
-                        <button onClick={() => move(row, 1)} title="Move down" className="p-1 hover:text-gray-200"><ChevronDown size={13} /></button>
-                        <button onClick={() => duplicateRow(row)} title="Duplicate" className="p-1 hover:text-gray-200"><Copy size={12} /></button>
-                        {canDelete && (
-                          <button onClick={() => deleteRow(row)} title="Delete" className="p-1 hover:text-red-400"><Trash2 size={12} /></button>
-                        )}
-                      </div>
+                  <td className="py-1 text-center">
+                    {canDelete && (
+                      <button onClick={() => deleteRow(row)} title="Delete row" className="p-1 text-gray-600 hover:text-red-400">
+                        <Trash2 size={12} />
+                      </button>
                     )}
                   </td>
                 </tr>
