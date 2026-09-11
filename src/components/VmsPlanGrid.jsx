@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { Plus, Trash2, Search, X, MessageSquareWarning } from 'lucide-react'
+import { Plus, Trash2, Search, X, MessageSquareWarning, Pencil, Check } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useToast } from './ui/Toast'
 import { VMS_RESULT } from '../lib/statusConfig'
@@ -14,8 +14,14 @@ const RESULT_CLASS = {
   not_tested: 'bg-gray-700/40 text-gray-400 border-gray-600/40',
 }
 
+// The fields a row's Edit button unlocks. RESULT is deliberately not one of
+// them — recording a result has to stay a single click.
+const EDITABLE = ['topic', 'scenario', 'test_steps', 'expected_result']
+
+const norm = (value) => value ?? ''
+
 // Grows with its content so multi-line steps stay readable while editing.
-function AutoTextarea({ value, onChange, onCommit, className }) {
+function AutoTextarea({ value, onChange, onKeyDown, autoFocus, className }) {
   const ref = useRef(null)
   useEffect(() => {
     const el = ref.current
@@ -23,12 +29,18 @@ function AutoTextarea({ value, onChange, onCommit, className }) {
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
   }, [value])
+  useEffect(() => {
+    if (!autoFocus || !ref.current) return
+    ref.current.focus()
+    const end = ref.current.value.length
+    ref.current.setSelectionRange(end, end)
+  }, [autoFocus])
   return (
     <textarea
       ref={ref}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      onBlur={onCommit}
+      onKeyDown={onKeyDown}
       rows={1}
       className={className}
     />
@@ -41,8 +53,12 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete })
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [resultFilter, setResultFilter] = useState('all')
-  const [drafts, setDrafts] = useState({})
   const [failFor, setFailFor] = useState(null)   // { row, existing } | null
+
+  // Rows are read-only until their Edit button is clicked; one row at a time.
+  const [editingId, setEditingId] = useState(null)
+  const [draft, setDraft] = useState({})
+  const [saving, setSaving] = useState(false)
 
   const fetchRows = async () => {
     const { data, error } = await supabase
@@ -57,25 +73,53 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete })
 
   useEffect(() => { fetchRows() }, [planId])
 
-  const valueOf = (row, field) => (drafts[row.id]?.[field] ?? row[field] ?? '')
+  const editingRow = rows.find((r) => r.id === editingId)
+  const isDirty = editingRow ? EDITABLE.some((f) => norm(draft[f]) !== norm(editingRow[f])) : false
 
-  const setDraft = (id, field, value) =>
-    setDrafts((d) => ({ ...d, [id]: { ...d[id], [field]: value } }))
+  const openEditor = (row) => {
+    setEditingId(row.id)
+    setDraft(Object.fromEntries(EDITABLE.map((f) => [f, row[f] ?? ''])))
+  }
 
-  const commit = async (row, field) => {
-    const next = drafts[row.id]?.[field]
-    if (next === undefined || next === (row[field] ?? '')) return
-    setRows((rs) => rs.map((r) => (r.id === row.id ? { ...r, [field]: next } : r)))
-    setDrafts((d) => {
-      const copy = { ...d }
-      if (copy[row.id]) { delete copy[row.id][field]; if (!Object.keys(copy[row.id]).length) delete copy[row.id] }
-      return copy
-    })
+  // Switching rows would silently drop what was typed, so ask first.
+  const confirmDiscard = () =>
+    !isDirty || confirm('You have unsaved changes on the row you are editing. Discard them?')
+
+  const startEdit = (row) => {
+    if (editingId === row.id) return
+    if (!confirmDiscard()) return
+    openEditor(row)
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setDraft({})
+  }
+
+  const saveEdit = async () => {
+    if (!editingRow || saving) return
+    const changes = {}
+    for (const f of EDITABLE) {
+      if (norm(draft[f]) !== norm(editingRow[f])) changes[f] = draft[f] || null
+    }
+    if (!Object.keys(changes).length) { cancelEdit(); return }
+
+    setSaving(true)
     const { error } = await supabase
       .from('vms_test_plan_rows')
-      .update({ [field]: next || null, updated_at: new Date().toISOString() })
-      .eq('id', row.id)
-    if (error) { toast.error(error.message); fetchRows() }
+      .update({ ...changes, updated_at: new Date().toISOString() })
+      .eq('id', editingRow.id)
+    setSaving(false)
+    // Stay in edit mode on failure so nothing that was typed is lost.
+    if (error) { toast.error(error.message); return }
+
+    setRows((rs) => rs.map((r) => (r.id === editingRow.id ? { ...r, ...changes } : r)))
+    cancelEdit()
+  }
+
+  const onEditKeyDown = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); cancelEdit() }
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); saveEdit() }
   }
 
   // Failing a case needs a reason first, so nothing is written — and the
@@ -112,24 +156,21 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete })
     return true
   }
 
-  const addRow = async (afterRow) => {
-    const order = afterRow ? afterRow.sort_order + 1 : (rows[rows.length - 1]?.sort_order ?? -1) + 1
-    // Push everything below down so the new row lands where it was asked for.
-    if (afterRow) {
-      await Promise.all(
-        rows.filter((r) => r.sort_order >= order)
-            .map((r) => supabase.from('vms_test_plan_rows').update({ sort_order: r.sort_order + 1 }).eq('id', r.id)))
-    }
-    const { error } = await supabase.from('vms_test_plan_rows').insert({
-      plan_id: planId,
-      project_id: projectId,
-      topic: afterRow?.topic || '',
-      scenario: '',
-      sort_order: order,
-      result: 'not_tested',
-    })
+  // A new row is blank, so it opens straight in edit mode rather than making
+  // the user find it among hundreds of rows and click Edit.
+  const addRow = async () => {
+    if (!confirmDiscard()) return
+    const order = (rows[rows.length - 1]?.sort_order ?? -1) + 1
+    const { data, error } = await supabase
+      .from('vms_test_plan_rows')
+      .insert({ plan_id: planId, project_id: projectId, topic: '', scenario: '', sort_order: order, result: 'not_tested' })
+      .select()
+      .single()
     if (error) { toast.error(error.message); return }
-    fetchRows()
+    setRows((rs) => [...rs, data])
+    setSearch('')
+    setResultFilter('all')
+    openEditor(data)
   }
 
   const deleteRow = async (row) => {
@@ -137,6 +178,7 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete })
     const { error } = await supabase.from('vms_test_plan_rows').delete().eq('id', row.id)
     if (error) { toast.error(error.message); return }
     setRows((rs) => rs.filter((r) => r.id !== row.id))
+    if (editingId === row.id) cancelEdit()
   }
 
   const filtered = useMemo(() => {
@@ -154,8 +196,23 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete })
     return c
   }, [rows])
 
-  const cellClass =
-    'w-full bg-transparent text-[12px] text-gray-200 leading-[1.4] resize-none outline-none focus:bg-gray-800/60 rounded px-1.5 py-0.5 whitespace-pre-wrap block'
+  const readClass = 'px-1.5 py-0.5 text-[12px] leading-[1.4] whitespace-pre-wrap break-words'
+  const editClass =
+    'w-full bg-gray-900 border border-gray-600 focus:border-blue-500 text-[12px] text-gray-100 leading-[1.4] resize-none outline-none rounded px-1.5 py-0.5 whitespace-pre-wrap block'
+
+  const readCell = (value, extra = '') => (
+    <div className={`${readClass} ${extra}`}>{value || <span className="text-gray-600">—</span>}</div>
+  )
+
+  const editCell = (field, extra = '', autoFocus = false) => (
+    <AutoTextarea
+      value={draft[field] ?? ''}
+      onChange={(v) => setDraft((d) => ({ ...d, [field]: v }))}
+      onKeyDown={onEditKeyDown}
+      autoFocus={autoFocus}
+      className={`${editClass} ${extra}`}
+    />
+  )
 
   if (loading) return <div className="h-40 bg-gray-800/40 rounded-lg animate-pulse" />
 
@@ -193,7 +250,7 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete })
 
         {canAuthor && (
           <button
-            onClick={() => addRow(null)}
+            onClick={addRow}
             className="ml-auto flex items-center gap-1.5 bg-blue-500 hover:bg-blue-400 text-white px-2.5 py-1.5 rounded-md text-[12px] font-semibold"
           >
             <Plus size={13} /> Add Row
@@ -210,7 +267,7 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete })
                   {label}
                 </th>
               ))}
-              <th className="w-9 py-1.5 border-b border-gray-700" />
+              <th className="w-16 py-1.5 border-b border-gray-700" />
             </tr>
           </thead>
           <tbody>
@@ -218,28 +275,27 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete })
               // Repeat the Topic only when it changes, the way the sheet reads.
               const previous = filtered[i - 1]
               const newTopic = !previous || previous.topic !== row.topic
+              const editing = row.id === editingId
               return (
-                <tr key={row.id} className={`align-top border-b border-gray-800/70 hover:bg-gray-800/30 ${newTopic ? 'border-t border-t-gray-700' : ''}`}>
-                  <td className="px-1 py-0.5">
-                    {newTopic ? (
-                      <AutoTextarea
-                        value={valueOf(row, 'topic')}
-                        onChange={(v) => setDraft(row.id, 'topic', v)}
-                        onCommit={() => commit(row, 'topic')}
-                        className={`${cellClass} font-semibold text-white`}
-                      />
-                    ) : (
-                      <span className="block px-1.5 py-0.5 text-[12px] text-gray-600">↳</span>
-                    )}
+                <tr
+                  key={row.id}
+                  className={`align-top border-b border-gray-800/70 ${editing ? 'bg-blue-500/[0.06]' : 'hover:bg-gray-800/30'} ${newTopic ? 'border-t border-t-gray-700' : ''}`}
+                >
+                  <td className={`px-1 py-0.5 ${editing ? 'shadow-[inset_2px_0_0_0_#3b82f6]' : ''}`}>
+                    {editing
+                      ? editCell('topic', 'font-semibold', true)
+                      : newTopic
+                        ? readCell(row.topic, 'font-semibold text-white')
+                        : <span className="block px-1.5 py-0.5 text-[12px] text-gray-600">↳</span>}
                   </td>
                   <td className="px-1 py-0.5">
-                    <AutoTextarea value={valueOf(row, 'scenario')} onChange={(v) => setDraft(row.id, 'scenario', v)} onCommit={() => commit(row, 'scenario')} className={cellClass} />
+                    {editing ? editCell('scenario') : readCell(row.scenario, 'text-gray-200')}
                   </td>
                   <td className="px-1 py-0.5">
-                    <AutoTextarea value={valueOf(row, 'test_steps')} onChange={(v) => setDraft(row.id, 'test_steps', v)} onCommit={() => commit(row, 'test_steps')} className={`${cellClass} text-gray-300`} />
+                    {editing ? editCell('test_steps') : readCell(row.test_steps, 'text-gray-300')}
                   </td>
                   <td className="px-1 py-0.5">
-                    <AutoTextarea value={valueOf(row, 'expected_result')} onChange={(v) => setDraft(row.id, 'expected_result', v)} onCommit={() => commit(row, 'expected_result')} className={`${cellClass} text-gray-300`} />
+                    {editing ? editCell('expected_result') : readCell(row.expected_result, 'text-gray-300')}
                   </td>
                   <td className="px-1.5 py-1">
                     <select
@@ -263,12 +319,50 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete })
                       </button>
                     )}
                   </td>
-                  <td className="py-1 text-center">
-                    {canDelete && (
-                      <button onClick={() => deleteRow(row)} title="Delete row" className="p-1 text-gray-600 hover:text-red-400">
-                        <Trash2 size={12} />
-                      </button>
-                    )}
+                  <td className="py-1 px-1">
+                    <div className="flex items-center justify-center gap-0.5">
+                      {editing ? (
+                        <>
+                          <button
+                            onClick={saveEdit}
+                            disabled={saving}
+                            title="Save (Ctrl+Enter)"
+                            className="p-1 rounded text-green-400 hover:bg-green-500/10 disabled:opacity-40"
+                          >
+                            <Check size={14} />
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            disabled={saving}
+                            title="Cancel (Esc)"
+                            className="p-1 rounded text-gray-400 hover:text-gray-200 hover:bg-gray-700 disabled:opacity-40"
+                          >
+                            <X size={14} />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          {canAuthor && (
+                            <button
+                              onClick={() => startEdit(row)}
+                              title="Edit row"
+                              className="p-1 rounded text-gray-500 hover:text-blue-400 hover:bg-blue-500/10"
+                            >
+                              <Pencil size={12} />
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button
+                              onClick={() => deleteRow(row)}
+                              title="Delete row"
+                              className="p-1 rounded text-gray-600 hover:text-red-400 hover:bg-red-500/10"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               )
@@ -285,7 +379,7 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete })
       </div>
 
       <p className="text-[11px] text-gray-500">
-        Showing {filtered.length} of {rows.length} rows. Click any cell to edit — changes save when you click away.
+        Showing {filtered.length} of {rows.length} rows. Click the pencil on a row to edit it — Ctrl+Enter saves, Esc cancels.
       </p>
 
       <FailCommentModal
