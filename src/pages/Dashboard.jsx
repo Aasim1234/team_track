@@ -278,7 +278,8 @@ export default function Dashboard() {
         <div className="flex-1 min-w-0 p-6 md:p-8 animate-pulse">
           <div className="h-8 w-64 bg-gray-800 rounded-lg mb-6" />
           <div className="grid grid-cols-12 gap-4 mb-4">
-            {Array.from({ length: 2 }).map((_, i) => <div key={i} className="col-span-12 md:col-span-6 h-40 bg-gray-800 rounded-2xl" />)}
+            <div className="col-span-12 md:col-span-4 h-40 bg-gray-800 rounded-2xl" />
+            <div className="col-span-12 md:col-span-8 h-40 bg-gray-800 rounded-2xl" />
           </div>
           <div className="grid grid-cols-12 gap-4">
             {Array.from({ length: 3 }).map((_, i) => <div key={i} className="col-span-12 md:col-span-4 h-32 bg-gray-800 rounded-2xl" />)}
@@ -320,16 +321,15 @@ export default function Dashboard() {
 
           {/* Row 1 — Execution Trend / Testing Coverage */}
           <div className="grid grid-cols-12 gap-4 mb-4">
-            <BentoCard className="col-span-12 md:col-span-6 p-4">
-              <div className="flex items-center justify-between mb-1">
+            <BentoCard className="col-span-12 md:col-span-4 p-4">
+              <div className="flex items-center justify-between mb-3">
                 <p className="text-[13px] font-semibold text-white">Execution Trend</p>
-                <span className="text-[11px] text-gray-500">{activeRuns} active runs</span>
+                <span className="text-[11px] text-gray-500">14 days · {activeRuns} active</span>
               </div>
-              <p className="text-[11px] text-gray-500 mb-3">Test executions per day, last 14 days</p>
               <TrendChart data={executionTrend} color="blue" />
             </BentoCard>
 
-            <BentoCard className="col-span-12 md:col-span-6 p-5">
+            <BentoCard className="col-span-12 md:col-span-8 p-5">
               <div className="flex items-center justify-between mb-4">
                 <p className="text-[14px] font-semibold text-white">Testing Coverage</p>
                 <span className="text-[11px] text-gray-500">{coverageTotal.toLocaleString()} executions</span>
@@ -337,17 +337,17 @@ export default function Dashboard() {
               {donutEntries.length === 0 ? (
                 <p className="text-[12px] text-gray-500">No test executions recorded yet.</p>
               ) : (
-                <div className="flex items-center gap-8">
+                <div className="flex items-center gap-10">
                   {/* The svg is rotated so segments start at 12 o'clock; the
                       centre label sits in an overlay so it stays upright. */}
                   <div className="relative flex-shrink-0">
-                    <Donut entries={donutEntries} size={168} thickness={18} />
+                    <Donut entries={donutEntries} size={188} thickness={20} />
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-[26px] font-bold text-white leading-none">{passRate}%</span>
+                      <span className="text-[30px] font-bold text-white leading-none">{passRate}%</span>
                       <span className="text-[11px] text-gray-400 mt-1">pass rate</span>
                     </div>
                   </div>
-                  <div className="flex-1 min-w-0 space-y-2.5">
+                  <div className="flex-1 min-w-0 max-w-md space-y-3">
                     {donutEntries.map((e) => (
                       <div key={e.key} className="flex items-center gap-2.5 text-[13px]">
                         <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${DONUT_DOT[e.color] || DONUT_DOT.gray}`} />
