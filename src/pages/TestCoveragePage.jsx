@@ -1,0 +1,340 @@
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { motion } from 'framer-motion'
+import { ArrowLeft, ClipboardCheck, CheckCircle2, XCircle, CircleDashed, PieChart } from 'lucide-react'
+import { supabase } from '../lib/supabaseClient'
+import { fetchAllRows } from '../lib/fetchAllRows'
+import ProjectSidebar from '../components/ProjectSidebar'
+import AppHeader from '../components/AppHeader'
+import StatCard from '../components/ui/StatCard'
+import BentoCard from '../components/ui/BentoCard'
+import EmptyState from '../components/ui/EmptyState'
+import { staggerContainer } from '../lib/motion'
+import {
+  ChartCard, StackedBars, Donut, Legend, DataTable,
+  STATUS_SERIES, AUTOMATION_SERIES, fmt, pctLabel,
+} from '../components/charts/CoverageCharts'
+
+const PRIORITY_ORDER = ['critical', 'high', 'medium', 'low']
+
+const blankCounts = () => Object.fromEntries(STATUS_SERIES.map((s) => [s.key, 0]))
+
+// "82.6% of 87" — the share of a group's run cases that have been executed.
+const executedLabel = (row) => (
+  <>
+    <span className="text-white font-medium">{pctLabel(row.total - row.counts.untested, row.total)}</span>
+    <span className="text-gray-500"> of {fmt(row.total)}</span>
+  </>
+)
+
+export default function TestCoveragePage() {
+  const navigate = useNavigate()
+  const [data, setData] = useState(null)
+  const [error, setError] = useState(null)
+  const [projectId, setProjectId] = useState('all')
+  const [activeStatus, setActiveStatus] = useState(null)
+
+  useEffect(() => {
+    const load = async () => {
+      const results = await Promise.all([
+        supabase.from('projects').select('id, name').order('name'),
+        supabase.from('test_runs').select('id, name, project_id'),
+        fetchAllRows(() =>
+          supabase.from('test_run_case_current_status').select('run_case_id, run_id, test_case_id, project_id, current_status').order('run_case_id')),
+        fetchAllRows(() =>
+          supabase.from('test_cases').select('id, project_id, priority, automation_status, section_id').order('id')),
+        fetchAllRows(() => supabase.from('sections').select('id, suite_id').order('id')),
+        supabase.from('test_suites').select('id, name'),
+      ])
+      const failed = results.find((r) => r.error)
+      if (failed) { setError(failed.error.message); return }
+      const [projects, runs, statusRows, cases, sections, suites] = results.map((r) => r.data || [])
+      setData({ projects, runs, statusRows, cases, sections, suites })
+    }
+    load()
+  }, [])
+
+  const view = useMemo(() => {
+    if (!data) return null
+    const inScope = (p) => projectId === 'all' || p === projectId
+
+    const rows = data.statusRows.filter((r) => inScope(r.project_id) && r.current_status in blankCounts())
+    const cases = data.cases.filter((c) => inScope(c.project_id))
+    const caseById = new Map(data.cases.map((c) => [c.id, c]))
+    const suiteBySection = new Map(data.sections.map((s) => [s.id, s.suite_id]))
+    const suiteName = new Map(data.suites.map((s) => [s.id, s.name]))
+    const runName = new Map(data.runs.map((r) => [r.id, r.name]))
+
+    const group = (keyOf, labelOf) => {
+      const groups = new Map()
+      for (const r of rows) {
+        const key = keyOf(r)
+        if (key == null) continue
+        if (!groups.has(key)) groups.set(key, { id: key, label: labelOf(key), counts: blankCounts(), total: 0 })
+        const g = groups.get(key)
+        g.counts[r.current_status]++
+        g.total++
+      }
+      return [...groups.values()]
+    }
+
+    const overall = blankCounts()
+    rows.forEach((r) => { overall[r.current_status]++ })
+    const total = rows.length
+    const executed = total - overall.untested
+
+    const byRun = group((r) => r.run_id, (id) => runName.get(id) || 'Unknown run')
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))
+    const bySuite = group(
+      (r) => suiteBySection.get(caseById.get(r.test_case_id)?.section_id),
+      (id) => suiteName.get(id) || 'Unknown suite',
+    ).sort((a, b) => b.total - a.total)
+    const rank = (k) => { const i = PRIORITY_ORDER.indexOf(k); return i === -1 ? 99 : i }
+    const byPriority = group(
+      (r) => caseById.get(r.test_case_id)?.priority || 'none',
+      (k) => (k === 'none' ? 'No priority' : k[0].toUpperCase() + k.slice(1)),
+    ).sort((a, b) => rank(a.id) - rank(b.id))
+
+    const automation = Object.fromEntries(AUTOMATION_SERIES.map((s) => [s.key, 0]))
+    cases.forEach((c) => {
+      const k = c.automation_status || 'not_automated'
+      if (k in automation) automation[k]++
+    })
+    const caseTotal = Object.values(automation).reduce((a, b) => a + b, 0)
+
+    return {
+      overall, total, executed,
+      passRate: executed ? (overall.passed / executed) * 100 : 0,
+      progress: total ? (executed / total) * 100 : 0,
+      byRun, bySuite, byPriority, automation, caseTotal,
+    }
+  }, [data, projectId])
+
+  const header = (
+    <AppHeader breadcrumb={[{ label: 'My Workspace' }, { label: 'Dashboard', to: '/dashboard' }, { label: 'Test Coverage' }]} />
+  )
+
+  if (!view) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white flex">
+        <ProjectSidebar />
+        <div className="flex-1 min-w-0">
+          {header}
+          <div className="p-6 md:p-8 max-w-7xl mx-auto">
+            {error ? (
+              <EmptyState icon={PieChart} title="Couldn't load coverage" description={error} />
+            ) : (
+              <div className="animate-pulse space-y-4">
+                <div className="h-8 w-56 bg-gray-800 rounded-lg" />
+                <div className="grid grid-cols-12 gap-4">
+                  <div className="col-span-12 lg:col-span-4 h-52 bg-gray-800 rounded-2xl" />
+                  <div className="col-span-12 lg:col-span-8 h-52 bg-gray-800 rounded-2xl" />
+                </div>
+                <div className="grid grid-cols-12 gap-4">
+                  <div className="col-span-12 lg:col-span-5 h-72 bg-gray-800 rounded-2xl" />
+                  <div className="col-span-12 lg:col-span-7 h-72 bg-gray-800 rounded-2xl" />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const { overall, total, executed, passRate, progress, byRun, bySuite, byPriority, automation, caseTotal } = view
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white flex">
+      <ProjectSidebar />
+      <div className="flex-1 min-w-0">
+        {header}
+
+        <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="flex items-center gap-1.5 text-[12px] font-medium text-gray-400 hover:text-white mb-2"
+              >
+                <ArrowLeft size={13} /> Dashboard
+              </button>
+              <h2 className="text-2xl font-bold tracking-tight">Test Coverage</h2>
+              <p className="text-sm text-gray-400 mt-1">
+                Execution status across {byRun.length} test run{byRun.length === 1 ? '' : 's'} and {bySuite.length} suite{bySuite.length === 1 ? '' : 's'}.
+              </p>
+            </div>
+            {/* The one filter row: it scopes every figure on the page. */}
+            {data.projects.length > 1 && (
+              <select
+                value={projectId}
+                onChange={(e) => setProjectId(e.target.value)}
+                className="bg-gray-800 border border-gray-600 rounded-md px-2.5 py-1.5 text-[12px] text-gray-200 outline-none"
+              >
+                <option value="all">All projects</option>
+                {data.projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            )}
+          </div>
+
+          {total === 0 ? (
+            <EmptyState icon={PieChart} title="No test executions yet" description="Once test runs have results, coverage appears here." />
+          ) : (
+            <>
+              {/* Headline: pass rate is the one hero figure; tiles carry the rest. */}
+              <div className="grid grid-cols-12 gap-4">
+                <BentoCard noHover className="col-span-12 lg:col-span-4 p-5 flex flex-col">
+                  <p className="text-[13px] font-semibold text-gray-400">Pass rate</p>
+                  <p className="text-[52px] font-bold text-white leading-none mt-3">{passRate.toFixed(1)}%</p>
+                  <p className="text-[12px] text-gray-500 mt-2">
+                    {fmt(overall.passed)} of {fmt(executed)} executed run cases passed
+                  </p>
+                  <div className="mt-auto pt-5">
+                    <div className="flex justify-between text-[12px] mb-1.5">
+                      <span className="text-gray-400">Execution progress</span>
+                      <span className="text-white font-semibold">{progress.toFixed(1)}%</span>
+                    </div>
+                    {/* Meter: the track is a lighter step of the fill's own ramp. */}
+                    <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--viz-meter-track)' }}>
+                      <motion.div
+                        className="h-full rounded-full"
+                        style={{ background: 'var(--viz-meter-fill)' }}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${progress}%` }}
+                        transition={{ duration: 0.7, ease: 'easeOut' }}
+                      />
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-1.5">{fmt(executed)} of {fmt(total)} run cases executed</p>
+                  </div>
+                </BentoCard>
+
+                <motion.div
+                  variants={staggerContainer}
+                  initial="initial"
+                  animate="animate"
+                  className="col-span-12 lg:col-span-8 grid grid-cols-2 gap-4"
+                >
+                  <StatCard icon={ClipboardCheck} label="Run cases" value={total} tint="bg-blue-50 text-blue-600" />
+                  <StatCard icon={CheckCircle2} label="Passed" value={overall.passed} tint="bg-green-50 text-green-600" />
+                  <StatCard icon={XCircle} label="Failed" value={overall.failed} tint="bg-red-50 text-red-600" />
+                  <StatCard icon={CircleDashed} label="Untested" value={overall.untested} tint="bg-gray-100 text-gray-600" />
+                </motion.div>
+              </div>
+
+              <div className="grid grid-cols-12 gap-4">
+                <ChartCard
+                  className="col-span-12 lg:col-span-5"
+                  title="Status distribution"
+                  subtitle={`${fmt(total)} run cases, all statuses`}
+                  table={<DataTable rows={[{ id: 'all', label: 'All run cases', counts: overall, total }]} series={STATUS_SERIES} firstColumn="Scope" />}
+                >
+                  <div className="flex flex-col sm:flex-row items-center gap-6">
+                    <Donut
+                      series={STATUS_SERIES}
+                      counts={overall}
+                      active={activeStatus}
+                      onActive={setActiveStatus}
+                      centerValue={fmt(total)}
+                      centerLabel="run cases"
+                    />
+                    <ul className="flex-1 w-full space-y-0.5">
+                      {STATUS_SERIES.filter((s) => overall[s.key] > 0).map((s) => (
+                        <li key={s.key}>
+                          <button
+                            onMouseEnter={() => setActiveStatus(s.key)}
+                            onMouseLeave={() => setActiveStatus(null)}
+                            onFocus={() => setActiveStatus(s.key)}
+                            onBlur={() => setActiveStatus(null)}
+                            className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md text-[13px] outline-none ${
+                              activeStatus === s.key ? 'bg-gray-650' : ''
+                            }`}
+                          >
+                            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                            <span className="flex-1 text-left text-gray-300">{s.label}</span>
+                            <span className="text-white font-semibold tabular-nums">{fmt(overall[s.key])}</span>
+                            <span className="w-12 text-right text-gray-500 tabular-nums">{pctLabel(overall[s.key], total)}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </ChartCard>
+
+                <ChartCard
+                  className="col-span-12 lg:col-span-7"
+                  title="Coverage by suite"
+                  subtitle="Status mix of each suite's run cases"
+                  table={<DataTable rows={bySuite} series={STATUS_SERIES} firstColumn="Suite" />}
+                >
+                  <Legend series={STATUS_SERIES} totals={overall} />
+                  <div className="mt-4">
+                    <StackedBars rows={bySuite} series={STATUS_SERIES} valueLabel={executedLabel} headers={['Suite', 'Executed']} />
+                  </div>
+                </ChartCard>
+              </div>
+
+              <ChartCard
+                title="Status by test run"
+                subtitle="Status mix of every test run, side by side"
+                table={<DataTable rows={byRun} series={STATUS_SERIES} firstColumn="Test run" />}
+              >
+                <Legend series={STATUS_SERIES} totals={overall} />
+                <div className="mt-4">
+                  <StackedBars rows={byRun} series={STATUS_SERIES} valueLabel={executedLabel} headers={['Test run', 'Executed']} />
+                </div>
+              </ChartCard>
+
+              <div className="grid grid-cols-12 gap-4">
+                <ChartCard
+                  className="col-span-12 lg:col-span-7"
+                  title="Coverage by priority"
+                  subtitle="Status mix for each test case priority"
+                  table={<DataTable rows={byPriority} series={STATUS_SERIES} firstColumn="Priority" />}
+                >
+                  <Legend series={STATUS_SERIES} totals={overall} />
+                  <div className="mt-4">
+                    <StackedBars rows={byPriority} series={STATUS_SERIES} valueLabel={executedLabel} headers={['Priority', 'Executed']} />
+                  </div>
+                </ChartCard>
+
+                <ChartCard
+                  className="col-span-12 lg:col-span-5"
+                  title="Automation"
+                  subtitle={`${fmt(caseTotal)} test cases by automation stage`}
+                  table={
+                    <DataTable
+                      rows={[{ id: 'all', label: 'All test cases', counts: automation, total: caseTotal }]}
+                      series={AUTOMATION_SERIES}
+                      firstColumn="Scope"
+                    />
+                  }
+                >
+                  <p className="text-[40px] font-bold text-white leading-none">{pctLabel(automation.automated, caseTotal)}</p>
+                  <p className="text-[12px] text-gray-500 mt-1.5">
+                    {fmt(automation.automated)} of {fmt(caseTotal)} test cases automated
+                  </p>
+                  <div className="mt-5">
+                    <StackedBars
+                      compact
+                      rows={[{ id: 'automation', label: 'Test cases by automation stage', counts: automation, total: caseTotal }]}
+                      series={AUTOMATION_SERIES}
+                    />
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
+                    {AUTOMATION_SERIES.map((s) => (
+                      <div key={s.key} className="flex items-center gap-2 text-[12px]">
+                        <span className="w-2.5 h-2.5 rounded-[3px] flex-shrink-0" style={{ background: s.color }} />
+                        <span className="flex-1 text-gray-400">{s.label}</span>
+                        <span className="text-white font-medium tabular-nums">{fmt(automation[s.key])}</span>
+                      </div>
+                    ))}
+                  </div>
+                </ChartCard>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

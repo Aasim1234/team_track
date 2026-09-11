@@ -329,10 +329,21 @@ export default function Dashboard() {
               <TrendChart data={executionTrend} color="blue" />
             </BentoCard>
 
-            <BentoCard className="col-span-12 md:col-span-8 p-5">
+            <BentoCard
+              role="link"
+              tabIndex={0}
+              title="Open the full test coverage report"
+              onClick={() => navigate('/coverage')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/coverage') }
+              }}
+              className="col-span-12 md:col-span-8 p-5 cursor-pointer group outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+            >
               <div className="flex items-center justify-between mb-4">
                 <p className="text-[14px] font-semibold text-white">Testing Coverage</p>
-                <span className="text-[11px] text-gray-500">{coverageTotal.toLocaleString()} executions</span>
+                <span className="flex items-center gap-1 text-[11px] text-gray-500 group-hover:text-blue-400">
+                  {coverageTotal.toLocaleString()} executions · View details <ArrowUpRight size={12} />
+                </span>
               </div>
               {donutEntries.length === 0 ? (
                 <p className="text-[12px] text-gray-500">No test executions recorded yet.</p>

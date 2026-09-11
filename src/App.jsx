@@ -11,6 +11,7 @@ import ProjectOverviewPage from './pages/ProjectOverviewPage'
 import TestCasesPage from './pages/TestCasesPage'
 import TestRunsPage from './pages/TestRunsPage'
 import VmsTestPlansPage from './pages/VmsTestPlansPage'
+import TestCoveragePage from './pages/TestCoveragePage'
 import TodoPage from './pages/TodoPage'
 import ReportsPage from './pages/ReportsPage'
 import CommandPalette from './components/CommandPalette'
@@ -86,6 +87,14 @@ function AnimatedRoutes() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/coverage"
+          element={
+            <ProtectedRoute>
+              <TestCoveragePage />
             </ProtectedRoute>
           }
         />

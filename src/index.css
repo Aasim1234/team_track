@@ -88,6 +88,39 @@
 }
 
 /* ============================================
+   CHART COLOURS (Test Coverage page)
+   Status steps come from the dataviz reference status palette and are the
+   same in both themes. Neutrals and the automation ramp are stepped per
+   theme; the ramp passes the dataviz --ordinal checks against the card
+   surface in each (#FFFFFF light, #111827 dark).
+   ============================================ */
+:root {
+  --viz-pass: #0ca30c;
+  --viz-fail: #d03b3b;
+  --viz-blocked: #ec835a;
+  --viz-retest: #fab219;
+  --viz-skipped: #64748B;
+  --viz-untested: #CBD5E1;
+  --viz-auto-1: #86b6ef;
+  --viz-auto-2: #5598e7;
+  --viz-auto-3: #256abf;
+  --viz-auto-4: #104281;
+  --viz-meter-track: #cde2fb;
+  --viz-meter-fill: #256abf;
+}
+
+:root.dark {
+  --viz-skipped: #94A3B8;
+  --viz-untested: #475569;
+  --viz-auto-1: #184f95;
+  --viz-auto-2: #256abf;
+  --viz-auto-3: #5598e7;
+  --viz-auto-4: #9ec5f4;
+  --viz-meter-track: #104281;
+  --viz-meter-fill: #5598e7;
+}
+
+/* ============================================
    BASE
    ============================================ */
 body {
