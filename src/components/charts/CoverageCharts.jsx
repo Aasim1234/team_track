@@ -15,15 +15,6 @@ export const STATUS_SERIES = [
   { key: 'untested', label: 'Untested', color: 'var(--viz-untested)' },
 ]
 
-// Automation stages are ordered, so they take a one-hue ramp (validated with
-// the dataviz --ordinal checks against both card surfaces) instead of hues.
-export const AUTOMATION_SERIES = [
-  { key: 'not_automated', label: 'Not automated', color: 'var(--viz-auto-1)' },
-  { key: 'planned', label: 'Planned', color: 'var(--viz-auto-2)' },
-  { key: 'in_progress', label: 'In progress', color: 'var(--viz-auto-3)' },
-  { key: 'automated', label: 'Automated', color: 'var(--viz-auto-4)' },
-]
-
 export const fmt = (n) => (n ?? 0).toLocaleString()
 
 export function pctLabel(part, whole) {

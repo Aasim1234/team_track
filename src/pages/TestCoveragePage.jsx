@@ -12,7 +12,7 @@ import EmptyState from '../components/ui/EmptyState'
 import { staggerContainer } from '../lib/motion'
 import {
   ChartCard, StackedBars, Donut, Legend, DataTable,
-  STATUS_SERIES, AUTOMATION_SERIES, fmt, pctLabel,
+  STATUS_SERIES, fmt, pctLabel,
 } from '../components/charts/CoverageCharts'
 
 const PRIORITY_ORDER = ['critical', 'high', 'medium', 'low']
@@ -42,7 +42,7 @@ export default function TestCoveragePage() {
         fetchAllRows(() =>
           supabase.from('test_run_case_current_status').select('run_case_id, run_id, test_case_id, project_id, current_status').order('run_case_id')),
         fetchAllRows(() =>
-          supabase.from('test_cases').select('id, project_id, priority, automation_status, section_id').order('id')),
+          supabase.from('test_cases').select('id, project_id, priority, section_id').order('id')),
         fetchAllRows(() => supabase.from('sections').select('id, suite_id').order('id')),
         supabase.from('test_suites').select('id, name'),
       ])
@@ -59,7 +59,6 @@ export default function TestCoveragePage() {
     const inScope = (p) => projectId === 'all' || p === projectId
 
     const rows = data.statusRows.filter((r) => inScope(r.project_id) && r.current_status in blankCounts())
-    const cases = data.cases.filter((c) => inScope(c.project_id))
     const caseById = new Map(data.cases.map((c) => [c.id, c]))
     const suiteBySection = new Map(data.sections.map((s) => [s.id, s.suite_id]))
     const suiteName = new Map(data.suites.map((s) => [s.id, s.name]))
@@ -95,18 +94,11 @@ export default function TestCoveragePage() {
       (k) => (k === 'none' ? 'No priority' : k[0].toUpperCase() + k.slice(1)),
     ).sort((a, b) => rank(a.id) - rank(b.id))
 
-    const automation = Object.fromEntries(AUTOMATION_SERIES.map((s) => [s.key, 0]))
-    cases.forEach((c) => {
-      const k = c.automation_status || 'not_automated'
-      if (k in automation) automation[k]++
-    })
-    const caseTotal = Object.values(automation).reduce((a, b) => a + b, 0)
-
     return {
       overall, total, executed,
       passRate: executed ? (overall.passed / executed) * 100 : 0,
       progress: total ? (executed / total) * 100 : 0,
-      byRun, bySuite, byPriority, automation, caseTotal,
+      byRun, bySuite, byPriority,
     }
   }, [data, projectId])
 
@@ -142,7 +134,7 @@ export default function TestCoveragePage() {
     )
   }
 
-  const { overall, total, executed, passRate, progress, byRun, bySuite, byPriority, automation, caseTotal } = view
+  const { overall, total, executed, passRate, progress, byRun, bySuite, byPriority } = view
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex">
@@ -284,53 +276,16 @@ export default function TestCoveragePage() {
                 </div>
               </ChartCard>
 
-              <div className="grid grid-cols-12 gap-4">
-                <ChartCard
-                  className="col-span-12 lg:col-span-7"
-                  title="Coverage by priority"
-                  subtitle="Status mix for each test case priority"
-                  table={<DataTable rows={byPriority} series={STATUS_SERIES} firstColumn="Priority" />}
-                >
-                  <Legend series={STATUS_SERIES} totals={overall} />
-                  <div className="mt-4">
-                    <StackedBars rows={byPriority} series={STATUS_SERIES} valueLabel={executedLabel} headers={['Priority', 'Executed']} />
-                  </div>
-                </ChartCard>
-
-                <ChartCard
-                  className="col-span-12 lg:col-span-5"
-                  title="Automation"
-                  subtitle={`${fmt(caseTotal)} test cases by automation stage`}
-                  table={
-                    <DataTable
-                      rows={[{ id: 'all', label: 'All test cases', counts: automation, total: caseTotal }]}
-                      series={AUTOMATION_SERIES}
-                      firstColumn="Scope"
-                    />
-                  }
-                >
-                  <p className="text-[40px] font-bold text-white leading-none">{pctLabel(automation.automated, caseTotal)}</p>
-                  <p className="text-[12px] text-gray-500 mt-1.5">
-                    {fmt(automation.automated)} of {fmt(caseTotal)} test cases automated
-                  </p>
-                  <div className="mt-5">
-                    <StackedBars
-                      compact
-                      rows={[{ id: 'automation', label: 'Test cases by automation stage', counts: automation, total: caseTotal }]}
-                      series={AUTOMATION_SERIES}
-                    />
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
-                    {AUTOMATION_SERIES.map((s) => (
-                      <div key={s.key} className="flex items-center gap-2 text-[12px]">
-                        <span className="w-2.5 h-2.5 rounded-[3px] flex-shrink-0" style={{ background: s.color }} />
-                        <span className="flex-1 text-gray-400">{s.label}</span>
-                        <span className="text-white font-medium tabular-nums">{fmt(automation[s.key])}</span>
-                      </div>
-                    ))}
-                  </div>
-                </ChartCard>
-              </div>
+              <ChartCard
+                title="Coverage by priority"
+                subtitle="Status mix for each test case priority"
+                table={<DataTable rows={byPriority} series={STATUS_SERIES} firstColumn="Priority" />}
+              >
+                <Legend series={STATUS_SERIES} totals={overall} />
+                <div className="mt-4">
+                  <StackedBars rows={byPriority} series={STATUS_SERIES} valueLabel={executedLabel} headers={['Priority', 'Executed']} />
+                </div>
+              </ChartCard>
             </>
           )}
         </div>
