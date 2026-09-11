@@ -6,6 +6,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ProjectOverviewPage from './pages/ProjectOverviewPage'
 import VmsTestPlansPage from './pages/VmsTestPlansPage'
+import ActivityLogPage from './pages/ActivityLogPage'
 import TestCoveragePage from './pages/TestCoveragePage'
 import TodoPage from './pages/TodoPage'
 import ReportsPage from './pages/ReportsPage'
@@ -213,6 +214,14 @@ function AnimatedRoutes() {
           element={
             <ProtectedRoute>
               <TodoPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/project/:id/activity"
+          element={
+            <ProtectedRoute>
+              <ActivityLogPage />
             </ProtectedRoute>
           }
         />

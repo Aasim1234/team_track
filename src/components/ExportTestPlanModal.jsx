@@ -9,6 +9,7 @@ import { useToast } from './ui/Toast'
 import { downloadCsv } from '../lib/xlsx'
 import { downloadTestPlanXlsx } from '../lib/testPlanExport'
 import { VMS_RESULT } from '../lib/statusConfig'
+import { logExport } from '../lib/auditLog'
 
 // The export contract: the same five columns as the source sheet, in the same
 // order, and nothing else. Failure Comment is opt-in only.
@@ -70,7 +71,16 @@ export default function ExportTestPlanModal({ open, onClose, planId, planName, p
         generatedOn: new Date().toLocaleString(),
         generatedBy: generatedBy || '',
       })
-      toast.success(`Exported ${rows.length} row${rows.length === 1 ? '' : 's'}`)
+      // Recorded server-side: the database stamps who and when, not the browser.
+      const logError = await logExport({
+        planId: targetPlanId,
+        format,
+        filename: `${name.replace(/\.(xlsx|csv)$/i, '')}${extension}`,
+        rowCount: rows.length,
+        includeFailureComments,
+      })
+      if (logError) toast.error(`Exported, but it couldn't be recorded in the activity log: ${logError.message}`)
+      else toast.success(`Exported ${rows.length} row${rows.length === 1 ? '' : 's'}`)
       onClose()
     } catch (err) {
       toast.error(err.message || 'Export failed')

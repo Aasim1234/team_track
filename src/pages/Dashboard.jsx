@@ -22,6 +22,7 @@ import StatCard from '../components/ui/StatCard'
 import BentoCard from '../components/ui/BentoCard'
 import EmptyState from '../components/ui/EmptyState'
 import { summarizeCases, formatPercent } from '../lib/testMetrics'
+import { AUDIT_ACTIONS } from '../lib/auditLog'
 import { Donut, Swatch, CASE_SERIES, fmt, pctLabel } from '../components/charts/CoverageCharts'
 import { fadeInUp, staggerContainer, TRANSITION } from '../lib/motion'
 
@@ -118,7 +119,7 @@ export default function Dashboard() {
       supabase.from('test_runs').select('id, project_id, status'),
       fetchAllRows(() => supabase.from('test_run_case_current_status').select('run_case_id, test_case_id, current_status, last_executed_at').order('run_case_id')),
       fetchAllRows(() => supabase.from('test_results').select('id, executed_at').order('id')),
-      supabase.from('activity_log').select('*, profiles(name)').order('created_at', { ascending: false }).limit(8),
+      supabase.from('audit_log').select('id, project_id, actor_name, action, entity_label, occurred_at').order('occurred_at', { ascending: false }).order('id', { ascending: false }).limit(8),
       supabase.from('sprints').select('id, project_id, name, status').eq('status', 'active'),
       user ? supabase.from('starred_projects').select('project_id').eq('user_id', user.id) : Promise.resolve({ data: [] }),
     ])
@@ -410,13 +411,18 @@ export default function Dashboard() {
               <p className="text-[13px] font-semibold text-white mb-3 flex items-center gap-1.5"><ActivityIcon size={14} /> Recent Activity</p>
               <div className="space-y-2">
                 {activity.map((a) => (
-                  <div key={a.id} className="text-[12px]">
+                  <button
+                    key={a.id}
+                    onClick={() => navigate(`/project/${a.project_id}/activity`)}
+                    className="w-full text-left text-[12px] rounded-md px-1 -mx-1 py-0.5 hover:bg-gray-650"
+                  >
                     <p className="text-gray-300 truncate">
-                      <span className="font-medium text-white">{a.profiles?.name || 'Someone'}</span>{' '}
-                      {a.action_type?.replace(/_/g, ' ')}
+                      <span className="font-medium text-white">{a.actor_name}</span>{' '}
+                      {(AUDIT_ACTIONS[a.action]?.label || a.action).toLowerCase()}
+                      {a.entity_label && <span className="text-gray-400"> · {a.entity_label}</span>}
                     </p>
-                    <p className="text-gray-500">{timeAgo(a.created_at)}</p>
-                  </div>
+                    <p className="text-gray-500">{timeAgo(a.occurred_at)}</p>
+                  </button>
                 ))}
                 {activity.length === 0 && <p className="text-[12px] text-gray-500">No recent activity.</p>}
               </div>
