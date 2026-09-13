@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { ListChecks, FolderTree, Users } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import ProjectSidebar from '../components/ProjectSidebar'
@@ -9,49 +9,31 @@ import StatusBadge from '../components/ui/StatusBadge'
 import EmptyState from '../components/ui/EmptyState'
 import StatCard from '../components/ui/StatCard'
 import { PROJECT_MEMBER_ROLE } from '../lib/statusConfig'
-import { formatCaseId } from '../lib/testCaseId'
-
-const RECENT_LIMIT = 6
 
 export default function ProjectOverviewPage() {
   const { id } = useParams()
-  const navigate = useNavigate()
   const [project, setProject] = useState(null)
   const [suiteCount, setSuiteCount] = useState(0)
   const [sectionCount, setSectionCount] = useState(0)
   const [caseCount, setCaseCount] = useState(0)
-  const [recent, setRecent] = useState([])
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
-      const [{ data: proj }, { count: suites }, { count: sections }, { count: cases }, { data: recentRows }, { data: memberRows }] =
+      const [{ data: proj }, { count: suites }, { count: sections }, { count: cases }, { data: memberRows }] =
         await Promise.all([
           supabase.from('projects').select('*').eq('id', id).single(),
           supabase.from('test_suites').select('id', { count: 'exact', head: true }).eq('project_id', id),
           supabase.from('sections').select('id', { count: 'exact', head: true }).eq('project_id', id),
           supabase.from('test_cases').select('id', { count: 'exact', head: true }).eq('project_id', id),
-          // The test cases the team adds in VMS Test Plans, newest first by their
-          // real creation time. A few extra are read so rows that were added but
-          // never filled in can be skipped.
-          supabase
-            .from('vms_test_plan_rows')
-            .select('id, plan_id, case_number, topic, scenario, created_at')
-            .eq('project_id', id)
-            .order('created_at', { ascending: false })
-            .order('case_number', { ascending: false })
-            .limit(50),
           supabase.from('project_members').select('user_id, role, profiles(name, email)').eq('project_id', id),
         ])
       setProject(proj)
       setSuiteCount(suites || 0)
       setSectionCount(sections || 0)
       setCaseCount(cases || 0)
-      setRecent((recentRows || [])
-        .filter((r) => (r.scenario || '').trim() || (r.topic || '').trim())
-        .slice(0, RECENT_LIMIT))
       setMembers(memberRows || [])
       setLoading(false)
     }
@@ -99,25 +81,12 @@ export default function ProjectOverviewPage() {
             <StatCard icon={Users} label="Members" value={members.length} tint="bg-gray-100 text-gray-600" />
           </div>
 
+          {/* Reserved for the most recently created Test Plans (newest first by
+              their creation time, each opening its plan). Deliberately not
+              connected to test cases, assignments or To-Do. Empty until then. */}
           <div className="bg-gray-800 border border-gray-600 rounded-lg p-5 mb-6">
-            <p className="text-[13px] font-semibold text-white mb-3">Recently added test cases</p>
-            {recent.length === 0 ? (
-              <p className="px-2.5 py-2 text-[13px] text-gray-500">No recently added test cases.</p>
-            ) : (
-              <div className="space-y-0.5">
-                {recent.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => navigate(`/project/${id}/plans/${c.plan_id}?case=${c.id}`)}
-                    title="Open this test case in its test plan"
-                    className="w-full px-2.5 py-2 flex items-center gap-2 rounded-md text-left hover:bg-gray-650"
-                  >
-                    <span className="text-[11px] text-blue-500 font-mono flex-shrink-0">{formatCaseId(c.case_number)}</span>
-                    <span className="text-[13px] flex-1 truncate">{(c.scenario || '').trim() || c.topic}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+            <p className="text-[13px] font-semibold text-white mb-3">Recently added test plans</p>
+            <p className="px-2.5 py-2 text-[13px] text-gray-500">No recently added test plans.</p>
           </div>
 
           <div>
