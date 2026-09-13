@@ -439,7 +439,7 @@ export default function Dashboard() {
               </div>
               <p className="text-[12px] text-gray-500 mt-1">
                 Automated insights need a real AI provider configured first — this tile intentionally shows nothing
-                fabricated. Set one up from Administration → AI Hub when you're ready.
+                fabricated.
               </p>
             </BentoCard>
           </div>

@@ -1,7 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
-  ArrowLeft, LayoutDashboard, FolderKanban, Users, Sparkles,
-  SlidersHorizontal, Plug, Database, Settings, Gauge,
+  ArrowLeft, LayoutDashboard, FolderKanban, Users, Database, Settings, Gauge,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { usePermissions, ADMIN_PAGE_PERMISSIONS } from '../hooks/usePermissions'
@@ -13,9 +12,6 @@ const NAV_ITEMS = [
   { to: '/admin/projects', label: 'Projects', icon: FolderKanban },
   { to: '/admin/users', label: 'Users & Roles', icon: Users },
   { to: '/admin/team-performance', label: 'Team Performance', icon: Gauge },
-  { to: '/admin/ai-hub', label: 'AI Hub', icon: Sparkles },
-  { to: '/admin/customizations', label: 'Customizations', icon: SlidersHorizontal },
-  { to: '/admin/integration', label: 'Integration', icon: Plug },
   { to: '/admin/data-management', label: 'Data Management', icon: Database },
   { to: '/admin/site-settings', label: 'Site Settings', icon: Settings },
 ]

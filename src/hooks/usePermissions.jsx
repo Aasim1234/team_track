@@ -11,7 +11,7 @@ const PermissionsContext = createContext(null)
 export const ADMIN_AREA_PERMISSIONS = [
   'users.view', 'users.add', 'users.edit', 'users.assign_roles', 'roles.manage',
   'projects.create', 'projects.edit', 'projects.delete',
-  'admin.settings', 'admin.integrations', 'admin.data',
+  'admin.settings', 'admin.data',
 ]
 
 // Which permissions open each Administration page (any one is enough).
@@ -20,9 +20,6 @@ export const ADMIN_PAGE_PERMISSIONS = {
   '/admin/projects': ['projects.create', 'projects.edit', 'projects.delete'],
   '/admin/users': ['users.view'],
   '/admin/team-performance': ['users.view'],
-  '/admin/ai-hub': ['admin.settings'],
-  '/admin/customizations': ['admin.settings'],
-  '/admin/integration': ['admin.integrations'],
   '/admin/data-management': ['admin.data'],
   '/admin/site-settings': ['admin.settings'],
 }

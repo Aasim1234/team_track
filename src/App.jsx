@@ -18,9 +18,6 @@ import AdminProjectsPage from './pages/admin/AdminProjectsPage'
 import AdminUsersRolesPage from './pages/admin/AdminUsersRolesPage'
 import AdminTeamPerformancePage from './pages/admin/AdminTeamPerformancePage'
 import AdminMemberProfilePage from './pages/admin/AdminMemberProfilePage'
-import AdminAiHubPage from './pages/admin/AdminAiHubPage'
-import AdminCustomizationsPage from './pages/admin/AdminCustomizationsPage'
-import AdminIntegrationPage from './pages/admin/AdminIntegrationPage'
 import AdminDataManagementPage from './pages/admin/AdminDataManagementPage'
 import AdminSiteSettingsPage from './pages/admin/AdminSiteSettingsPage'
 
@@ -141,30 +138,6 @@ function AnimatedRoutes() {
           element={
             <AdminRoute page="/admin/team-performance">
               <AdminMemberProfilePage />
-            </AdminRoute>
-          }
-        />
-        <Route
-          path="/admin/ai-hub"
-          element={
-            <AdminRoute page="/admin/ai-hub">
-              <AdminAiHubPage />
-            </AdminRoute>
-          }
-        />
-        <Route
-          path="/admin/customizations"
-          element={
-            <AdminRoute page="/admin/customizations">
-              <AdminCustomizationsPage />
-            </AdminRoute>
-          }
-        />
-        <Route
-          path="/admin/integration"
-          element={
-            <AdminRoute page="/admin/integration">
-              <AdminIntegrationPage />
             </AdminRoute>
           }
         />
