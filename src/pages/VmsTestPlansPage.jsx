@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, ArrowLeft, ClipboardList, Link2, Unlink, Trash2, Pencil, Download } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { fetchAllRows } from '../lib/fetchAllRows'
@@ -230,6 +230,8 @@ export default function VmsTestPlansPage() {
 
 function TestPlanDetail({ projectId, planId, project, runs, statusRows, members, canAuthor, canDelete, canManageAssignments, userId, onRefreshList }) {
   const navigate = useNavigate()
+  // ?case=<test case id> opens the plan at that test case.
+  const [searchParams] = useSearchParams()
   const [showExport, setShowExport] = useState(false)
   const [plan, setPlan] = useState(null)
   const [items, setItems] = useState([])
@@ -420,6 +422,7 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
               canManageAssignments={canManageAssignments}
               userId={userId}
               members={members}
+              focusRowId={searchParams.get('case')}
             />
           </BentoCard>
         </div>

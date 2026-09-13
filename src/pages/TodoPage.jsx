@@ -14,12 +14,13 @@ import { useToast } from '../components/ui/Toast'
 import FailCommentModal from '../components/FailCommentModal'
 import { VMS_RESULT, TODO_TASK_STATUS } from '../lib/statusConfig'
 import { formatAuditTime } from '../lib/auditLog'
+import { formatCaseId } from '../lib/testCaseId'
 
 // A task is an assigned test case, read straight from the test case itself, so
 // To-Do and the Test Plan grid always show the same assignment, result and
 // task state — on every device, after every refresh.
 const TASK_FIELDS =
-  'id, plan_id, topic, scenario, test_steps, expected_result, result, failure_comment, ' +
+  'id, plan_id, case_number, topic, scenario, test_steps, expected_result, result, failure_comment, ' +
   'assigned_to, assigned_at, assigned_by, task_status, task_status_at, ' +
   'plan:test_plans(id, name), assigner:profiles!assigned_by(id, name)'
 
@@ -103,7 +104,7 @@ export default function TodoPage() {
   const doneTasks = tasks.filter((t) => t.task_status !== 'open')
   const q = search.trim().toLowerCase()
   const visible = (tab === 'open' ? openTasks : doneTasks)
-    .filter((t) => !q || `${t.scenario || ''} ${t.topic || ''} ${t.plan?.name || ''}`.toLowerCase().includes(q))
+    .filter((t) => !q || `${formatCaseId(t.case_number)} ${t.scenario || ''} ${t.topic || ''} ${t.plan?.name || ''}`.toLowerCase().includes(q))
 
   const assignerName = (t) =>
     !t.assigned_by ? 'System' : t.assigned_by === user?.id ? 'You' : t.assigner?.name || 'Unknown user'
@@ -224,6 +225,7 @@ export default function TodoPage() {
                     <tr key={t.id} className="align-top border-b border-gray-800/70 text-[12px] hover:bg-gray-800/30">
                       <td className="px-2.5 py-2">
                         <button onClick={() => setOpenId(t.id)} className="text-left text-white font-medium hover:text-blue-400 line-clamp-2">
+                          <span className="mr-1.5 font-mono text-[10px] text-blue-500">{formatCaseId(t.case_number)}</span>
                           {t.scenario || t.topic || 'Untitled test case'}
                         </button>
                         {t.topic && t.scenario && <p className="text-[11px] text-gray-500 truncate">{t.topic}</p>}
@@ -314,7 +316,10 @@ export default function TodoPage() {
           <div className="space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[15px] font-semibold text-white">{shown.scenario || shown.topic || 'Untitled test case'}</p>
+                <p className="text-[15px] font-semibold text-white">
+                  <span className="mr-2 font-mono text-[12px] text-blue-500">{formatCaseId(shown.case_number)}</span>
+                  {shown.scenario || shown.topic || 'Untitled test case'}
+                </p>
                 <p className="text-[12px] text-gray-500 mt-0.5">
                   {[shown.topic, shown.plan?.name].filter(Boolean).join(' · ')}
                 </p>

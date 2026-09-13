@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient'
 import { useToast } from './ui/Toast'
 import { VMS_RESULT } from '../lib/statusConfig'
 import FailCommentModal from './FailCommentModal'
+import { formatCaseId } from '../lib/testCaseId'
 
 const RESULT_CLASS = {
   pass: 'bg-green-500/10 text-green-400 border-green-500/30',
@@ -55,7 +56,7 @@ function AutoTextarea({ value, onChange, onKeyDown, autoFocus, className }) {
   )
 }
 
-export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAssignments, userId, members = [] }) {
+export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAssignments, userId, members = [], focusRowId }) {
   const toast = useToast()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -86,6 +87,19 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAss
   }
 
   useEffect(() => { fetchRows() }, [planId])
+
+  // Opened from a link to one test case (e.g. Recently added test cases):
+  // bring that row into view and highlight it briefly.
+  const [flashId, setFlashId] = useState(null)
+  useEffect(() => {
+    if (loading || !focusRowId) return
+    const show = setTimeout(() => {
+      document.getElementById(`case-${focusRowId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setFlashId(focusRowId)
+    }, 50)
+    const hide = setTimeout(() => setFlashId(null), 4000)
+    return () => { clearTimeout(show); clearTimeout(hide) }
+  }, [loading, focusRowId])
 
   // Pick up test cases other people took while this tab was in the background.
   useEffect(() => {
@@ -266,7 +280,7 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAss
       if (assignFilter === 'unassigned' && r.assigned_to) return false
       if (assignFilter === 'others' && (!r.assigned_to || r.assigned_to === userId)) return false
       if (!q) return true
-      return `${r.topic} ${r.scenario} ${r.test_steps} ${r.expected_result}`.toLowerCase().includes(q)
+      return `${formatCaseId(r.case_number)} ${r.topic} ${r.scenario} ${r.test_steps} ${r.expected_result}`.toLowerCase().includes(q)
     })
   }, [rows, search, resultFilter, assignFilter, userId])
 
@@ -366,7 +380,7 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAss
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search topic, scenario, steps…"
+            placeholder="Search ID, topic, scenario, steps…"
             className="bg-gray-800 border border-gray-700 rounded-md pl-7 pr-7 py-1.5 text-[12px] text-gray-200 w-72 outline-none focus:border-gray-600"
           />
           {search && (
@@ -437,7 +451,8 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAss
               return (
                 <tr
                   key={row.id}
-                  className={`align-top border-b border-gray-800/70 ${editing ? 'bg-blue-500/[0.06]' : 'hover:bg-gray-800/30'} ${newTopic ? 'border-t border-t-gray-700' : ''}`}
+                  id={`case-${row.id}`}
+                  className={`align-top border-b border-gray-800/70 ${editing ? 'bg-blue-500/[0.06]' : 'hover:bg-gray-800/30'} ${newTopic ? 'border-t border-t-gray-700' : ''} ${flashId === row.id ? 'bg-blue-500/10 shadow-[inset_3px_0_0_0_#3b82f6]' : ''}`}
                 >
                   <td className={`px-1 py-0.5 ${editing ? 'shadow-[inset_2px_0_0_0_#3b82f6]' : ''}`}>
                     {editing
@@ -447,7 +462,14 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAss
                         : <span className="block px-1.5 py-0.5 text-[12px] text-gray-600">↳</span>}
                   </td>
                   <td className="px-1 py-0.5">
-                    {editing ? editCell('scenario') : readCell(row.scenario, 'text-gray-200')}
+                    {editing ? editCell('scenario') : (
+                      <div className={`${readClass} text-gray-300`}>
+                        {row.case_number != null && (
+                          <span className="mr-1.5 font-mono text-[10px] text-blue-500">{formatCaseId(row.case_number)}</span>
+                        )}
+                        {row.scenario || <span className="text-gray-600">—</span>}
+                      </div>
+                    )}
                   </td>
                   <td className="px-1 py-0.5">
                     {editing ? editCell('test_steps') : readCell(row.test_steps, 'text-gray-300')}
