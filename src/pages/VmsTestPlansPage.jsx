@@ -417,7 +417,6 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
               planId={planId}
               projectId={projectId}
               canAuthor={canAuthor}
-              canDelete={canDelete}
               canManageAssignments={canManageAssignments}
               userId={userId}
               members={members}

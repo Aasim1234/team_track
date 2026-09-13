@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
-import { Plus, Trash2, Search, X, MessageSquareWarning, Pencil, Check, Lock, UserPlus, UserCheck } from 'lucide-react'
+import { Plus, Search, X, MessageSquareWarning, Pencil, Check, Lock, UserPlus, UserCheck } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useToast } from './ui/Toast'
 import { VMS_RESULT } from '../lib/statusConfig'
@@ -51,7 +51,7 @@ function AutoTextarea({ value, onChange, onKeyDown, autoFocus, className }) {
   )
 }
 
-export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete, canManageAssignments, userId, members = [] }) {
+export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAssignments, userId, members = [] }) {
   const toast = useToast()
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
@@ -254,14 +254,6 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete, c
     openEditor(data)
   }
 
-  const deleteRow = async (row) => {
-    if (!confirm('Delete this row?')) return
-    const { error } = await supabase.from('vms_test_plan_rows').delete().eq('id', row.id)
-    if (error) { toast.error(error.message); return }
-    setRows((rs) => rs.filter((r) => r.id !== row.id))
-    if (editingId === row.id) cancelEdit()
-  }
-
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return rows.filter((r) => {
@@ -427,7 +419,7 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete, c
                   {label}
                 </th>
               ))}
-              <th className="w-16 py-1.5 border-b border-gray-700" />
+              <th className="w-14 py-1.5 border-b border-gray-700" />
             </tr>
           </thead>
           <tbody>
@@ -512,26 +504,15 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canDelete, c
                           </button>
                         </>
                       ) : (
-                        <>
-                          {canUpdate && (
-                            <button
-                              onClick={() => startEdit(row)}
-                              title="Edit row"
-                              className="p-1 rounded text-gray-500 hover:text-blue-400 hover:bg-blue-500/10"
-                            >
-                              <Pencil size={12} />
-                            </button>
-                          )}
-                          {canDelete && (
-                            <button
-                              onClick={() => deleteRow(row)}
-                              title="Delete row"
-                              className="p-1 rounded text-gray-600 hover:text-red-400 hover:bg-red-500/10"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          )}
-                        </>
+                        canUpdate && (
+                          <button
+                            onClick={() => startEdit(row)}
+                            title="Edit row"
+                            className="p-1 rounded text-gray-500 hover:text-blue-400 hover:bg-blue-500/10"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                        )
                       )}
                     </div>
                   </td>
