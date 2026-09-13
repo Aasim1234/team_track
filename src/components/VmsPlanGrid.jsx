@@ -5,6 +5,7 @@ import { useToast } from './ui/Toast'
 import { VMS_RESULT } from '../lib/statusConfig'
 import FailCommentModal from './FailCommentModal'
 import { formatCaseId } from '../lib/testCaseId'
+import { usePermissions } from '../hooks/usePermissions'
 
 const RESULT_CLASS = {
   pass: 'bg-green-500/10 text-green-400 border-green-500/30',
@@ -56,8 +57,16 @@ function AutoTextarea({ value, onChange, onKeyDown, autoFocus, className }) {
   )
 }
 
-export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAssignments, userId, members = [], focusRowId }) {
+export default function VmsPlanGrid({ planId, projectId, userId, members = [], focusRowId }) {
   const toast = useToast()
+  // What this user may do comes from their role; the database enforces the same rules.
+  const { can } = usePermissions()
+  const canCreate = can('test_cases.create')
+  const canEdit = can('test_cases.edit')
+  const canAssign = can('test_cases.assign')
+  const canSelfAssign = can('test_cases.self_assign') || canAssign
+  const canExecuteAny = can('test_cases.execute_any')
+  const canExecute = can('test_cases.execute') || canExecuteAny
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -116,7 +125,17 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAss
 
   // Someone else's test case is read-only unless you may override assignments.
   // The database enforces the same rule; this only hides controls that would fail.
-  const isLocked = (row) => Boolean(row.assigned_to) && row.assigned_to !== userId && !canManageAssignments
+  const isLocked = (row) => Boolean(row.assigned_to) && row.assigned_to !== userId && !canAssign
+
+  // Recording a result: your own test case (with an execute permission), an
+  // unassigned one (Execute Any Test Case), or someone else's (Assign Test Case).
+  const canRunRow = (row) => canExecute && (
+    row.assigned_to === userId || (row.assigned_to ? canAssign : canExecuteAny))
+  const runBlockedReason = (row) => {
+    if (!canExecute) return "Your role can't execute test cases"
+    if (!row.assigned_to) return 'Assign this test case to yourself to execute it'
+    return `Assigned to ${assigneeName(row)} — only they or an Admin/Manager can update it`
+  }
 
   const applyRow = (id, patch) => setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)))
 
@@ -235,7 +254,22 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAss
     applyRow(row.id, { ...data[0], assignee: null })
   }
 
-  // Admin/Lead only: take over, hand over, or clear someone else's assignment.
+  // Assign a free test case to a specific person (Assign Test Case permission).
+  const assignToMember = async (row, target) => {
+    if (!target) return
+    const { data, error } = await supabase
+      .from('vms_test_plan_rows')
+      .update({ assigned_to: target })
+      .eq('id', row.id)
+      .is('assigned_to', null)
+      .select(ASSIGNMENT_FIELDS)
+    if (error) { toast.error(error.message); fetchRows(); return }
+    if (!data?.length) { toast.error('Someone else has just taken this test case.'); fetchRows(); return }
+    applyRow(row.id, { ...data[0], assignee: { id: target, name: memberNames[target] } })
+    toast.success(`Assigned to ${memberNames[target]} — added to their To-Do`)
+  }
+
+  // Assign Test Case permission only: take over, hand over, or clear someone else's assignment.
   const overrideAssignment = async (row, target) => {
     if (!target) return
     const from = assigneeName(row)
@@ -316,15 +350,31 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAss
   // Shown under each RESULT: who has the test case, and what you may do about it.
   const assignment = (row) => {
     if (!row.assigned_to) {
-      return canAuthor ? (
-        <button
-          onClick={() => assignToMe(row)}
-          className="mt-1 flex items-center gap-1 text-[10px] font-medium text-blue-400 hover:text-blue-300"
-        >
-          <UserPlus size={11} /> Assign to me
-        </button>
-      ) : (
-        <span className="mt-1 block text-[10px] text-gray-600">Unassigned</span>
+      if (!canSelfAssign && !canAssign) return <span className="mt-1 block text-[10px] text-gray-600">Unassigned</span>
+      return (
+        <>
+          {canSelfAssign && (
+            <button
+              onClick={() => assignToMe(row)}
+              className="mt-1 flex items-center gap-1 text-[10px] font-medium text-blue-400 hover:text-blue-300"
+            >
+              <UserPlus size={11} /> Assign to me
+            </button>
+          )}
+          {canAssign && (
+            <select
+              value=""
+              onChange={(e) => assignToMember(row, e.target.value)}
+              title="Assign this test case to someone"
+              className="mt-0.5 w-full text-[10px] bg-transparent border border-gray-700 hover:border-gray-600 rounded px-1 py-0.5 text-gray-500 outline-none"
+            >
+              <option value="" className="bg-gray-800">Assign to…</option>
+              {members.filter((m) => m.id !== userId).map((m) => (
+                <option key={m.id} value={m.id} className="bg-gray-800 text-gray-200">{m.name || 'Unnamed user'}</option>
+              ))}
+            </select>
+          )}
+        </>
       )
     }
 
@@ -344,17 +394,17 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAss
     return (
       <>
         <div
-          title={`Assigned to ${name}. Only ${name} or an Admin/Lead can update, unassign or reassign this test case.`}
+          title={`Assigned to ${name}. Only ${name} or an Admin/Manager can update, unassign or reassign this test case.`}
           className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-amber-500 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-0.5"
         >
           <Lock size={10} className="flex-shrink-0" />
           <span className="truncate">Assigned to {name}{TASK_SUFFIX[row.task_status] || ''}</span>
         </div>
-        {canManageAssignments && (
+        {canAssign && (
           <select
             value=""
             onChange={(e) => overrideAssignment(row, e.target.value)}
-            title="Admin/Lead override"
+            title="Admin/Manager override"
             className="mt-0.5 w-full text-[10px] bg-transparent border border-gray-700 hover:border-gray-600 rounded px-1 py-0.5 text-gray-500 outline-none"
           >
             <option value="" className="bg-gray-800">Override…</option>
@@ -418,7 +468,7 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAss
           <option value="others">Taken by others ({counts.others})</option>
         </select>
 
-        {canAuthor && (
+        {canCreate && (
           <button
             onClick={addRow}
             className="ml-auto flex items-center gap-1.5 bg-blue-500 hover:bg-blue-400 text-white px-2.5 py-1.5 rounded-md text-[12px] font-semibold"
@@ -447,7 +497,8 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAss
               const newTopic = !previous || previous.topic !== row.topic
               const editing = row.id === editingId
               const locked = isLocked(row)
-              const canUpdate = canAuthor && !locked
+              const canRun = canRunRow(row)
+              const canEditRow = canEdit && !locked
               return (
                 <tr
                   key={row.id}
@@ -481,8 +532,8 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAss
                     <select
                       value={row.result || 'not_tested'}
                       onChange={(e) => setResult(row, e.target.value)}
-                      disabled={!canUpdate}
-                      title={locked ? `Assigned to ${assigneeName(row)} — only they or an Admin/Lead can update it` : undefined}
+                      disabled={!canRun}
+                      title={canRun ? undefined : runBlockedReason(row)}
                       className={`w-full text-[11px] font-semibold rounded-md border px-1.5 py-0.5 outline-none disabled:cursor-not-allowed ${RESULT_CLASS[row.result] || RESULT_CLASS.not_tested}`}
                     >
                       {Object.entries(VMS_RESULT).map(([key, cfg]) => (
@@ -490,7 +541,7 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAss
                       ))}
                     </select>
                     {REASON_RESULTS.includes(row.result) && (
-                      canUpdate ? (
+                      canRun ? (
                         <button
                           onClick={() => setReasonFor({ row, status: row.result, existing: row.failure_comment || '' })}
                           title={row.failure_comment || ''}
@@ -530,7 +581,7 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAss
                           </button>
                         </>
                       ) : (
-                        canUpdate && (
+                        canEditRow && (
                           <button
                             onClick={() => startEdit(row)}
                             title="Edit row"

@@ -59,14 +59,13 @@ export default function ActivityLogPage() {
   useEffect(() => {
     Promise.all([
       supabase.from('projects').select('id, name').eq('id', projectId).single(),
-      supabase.from('audit_log_facets').select('kind, value, label').eq('project_id', projectId),
+      // Entries about users, roles and groups belong to no project, so they show in every project.
+      supabase.from('audit_log_facets').select('kind, value, label').or(`project_id.eq.${projectId},project_id.is.null`),
     ]).then(([{ data: proj }, { data: facetRows }]) => {
       setProject(proj)
       const byLabel = (a, b) => (a.label || '').localeCompare(b.label || '')
-      setFacets({
-        users: (facetRows || []).filter((f) => f.kind === 'user').sort(byLabel),
-        plans: (facetRows || []).filter((f) => f.kind === 'plan').sort(byLabel),
-      })
+      const unique = (kind) => [...new Map((facetRows || []).filter((f) => f.kind === kind).map((f) => [f.value, f])).values()].sort(byLabel)
+      setFacets({ users: unique('user'), plans: unique('plan') })
     })
   }, [projectId])
 
@@ -78,7 +77,7 @@ export default function ActivityLogPage() {
 
   // Filtering happens in the database, so the page stays quick as the log grows.
   const query = useCallback((offset) => {
-    let q = supabase.from('audit_log').select('*', { count: 'exact' }).eq('project_id', projectId)
+    let q = supabase.from('audit_log').select('*', { count: 'exact' }).or(`project_id.eq.${projectId},project_id.is.null`)
     if (filters.user === 'system') q = q.is('actor_id', null)
     else if (filters.user) q = q.eq('actor_id', filters.user)
     if (filters.action) q = q.eq('action', filters.action)
@@ -126,7 +125,7 @@ export default function ActivityLogPage() {
         />
         <PageHeader
           title="Activity Log"
-          subtitle="Who changed what, and when, across this project"
+          subtitle="Who changed what, and when — in this project and in users, roles and permissions"
           actions={
             <button
               onClick={load}

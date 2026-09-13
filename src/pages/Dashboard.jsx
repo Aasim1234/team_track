@@ -23,6 +23,7 @@ import BentoCard from '../components/ui/BentoCard'
 import EmptyState from '../components/ui/EmptyState'
 import { summarizeCases, formatPercent } from '../lib/testMetrics'
 import { AUDIT_ACTIONS } from '../lib/auditLog'
+import { usePermissions } from '../hooks/usePermissions'
 import { Donut, Swatch, CASE_SERIES, fmt, pctLabel } from '../components/charts/CoverageCharts'
 import { fadeInUp, staggerContainer, TRANSITION } from '../lib/motion'
 
@@ -90,15 +91,17 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
 
   const [showForm, setShowForm] = useState(false)
+  const { can } = usePermissions()
+  const canCreateProject = can('projects.create')
   const [name, setName] = useState('')
   const [key, setKey] = useState('')
 
   useEffect(() => {
-    if (searchParams.get('new') === '1') {
+    if (searchParams.get('new') === '1' && canCreateProject) {
       setShowForm(true)
       setSearchParams({}, { replace: true })
     }
-  }, [searchParams])
+  }, [searchParams, canCreateProject])
 
   const fetchAll = async () => {
     setLoading(true)
@@ -227,7 +230,7 @@ export default function Dashboard() {
       <div className="flex-1 min-w-0">
         <AppHeader
           breadcrumb={[{ label: 'My Workspace' }, { label: 'Dashboard' }]}
-          onQuickCreate={() => setShowForm(true)}
+          onQuickCreate={canCreateProject ? () => setShowForm(true) : undefined}
           quickCreateLabel="New Project"
         />
 
@@ -448,14 +451,14 @@ export default function Dashboard() {
               icon={FolderKanban}
               title="No projects yet"
               description="Create your first project to start tracking work."
-              action={
+              action={canCreateProject && (
                 <button
                   onClick={() => setShowForm(true)}
                   className="bg-blue-500 hover:bg-blue-400 px-4 py-2 rounded-md font-semibold text-[13px] text-white"
                 >
                   + New Project
                 </button>
-              }
+              )}
             />
           ) : (
             <motion.div

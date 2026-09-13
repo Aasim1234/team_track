@@ -6,16 +6,18 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
+import { usePermissions } from '../hooks/usePermissions'
 import { recordRecentProject } from '../lib/recentProjects'
 import { fadeIn, scaleIn, TRANSITION } from '../lib/motion'
 
 const ACTIONS = [
   { id: 'nav-dashboard', label: 'Go to Dashboard', icon: LayoutDashboard, to: '/dashboard' },
-  { id: 'new-project', label: 'Create new project', icon: Plus, to: '/dashboard?new=1' },
+  { id: 'new-project', label: 'Create new project', icon: Plus, to: '/dashboard?new=1', need: 'projects.create' },
 ]
 
 export default function CommandPalette() {
   const { user } = useAuth()
+  const { can } = usePermissions()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -55,7 +57,7 @@ export default function CommandPalette() {
   }, [open])
 
   const q = query.trim().toLowerCase()
-  const filteredActions = ACTIONS.filter((a) => !q || a.label.toLowerCase().includes(q))
+  const filteredActions = ACTIONS.filter((a) => (!a.need || can(a.need)) && (!q || a.label.toLowerCase().includes(q)))
   const filteredProjects = projects.filter(
     (p) => !q || p.name.toLowerCase().includes(q) || p.key?.toLowerCase().includes(q)
   )

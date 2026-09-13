@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
+import { usePermissions } from '../hooks/usePermissions'
 import { getRecentIds, recordRecentProject } from '../lib/recentProjects'
 import SidebarNavButton from './ui/SidebarNavButton'
 import SidebarFooter from './ui/SidebarFooter'
@@ -22,11 +23,11 @@ const NAV_ITEMS = [
 function projectNavItems(projectId) {
   const base = `/project/${projectId}`
   return [
-    { to: `${base}/overview`, label: 'Project Overview', icon: Home },
-    { to: `${base}/todo`, label: 'To-Do', icon: CheckSquare },
-    { to: `${base}/plans`, label: 'VMS Test Plans', icon: ClipboardList },
-    { to: `${base}/reports`, label: 'Reports', icon: BarChart3 },
-    { to: `${base}/activity`, label: 'Activity Log', icon: History },
+    { to: `${base}/overview`, label: 'Project Overview', icon: Home, need: 'projects.view' },
+    { to: `${base}/todo`, label: 'To-Do', icon: CheckSquare, need: 'test_cases.view' },
+    { to: `${base}/plans`, label: 'VMS Test Plans', icon: ClipboardList, need: 'test_plans.view' },
+    { to: `${base}/reports`, label: 'Reports', icon: BarChart3, need: 'reports.view' },
+    { to: `${base}/activity`, label: 'Activity Log', icon: History, need: 'admin.audit_logs' },
   ]
 }
 
@@ -72,6 +73,7 @@ function SectionHeader({ icon: Icon, label, open, onToggle, action }) {
 
 export default function ProjectSidebar() {
   const { user } = useAuth()
+  const { can } = usePermissions()
   const navigate = useNavigate()
   const { id: currentProjectId } = useParams()
   const { pathname } = useLocation()
@@ -178,7 +180,7 @@ export default function ProjectSidebar() {
         {inProjectContext ? (
           <>
             <nav className="space-y-0.5">
-              {projectNavItems(currentProjectId).map((item) => (
+              {projectNavItems(currentProjectId).filter((item) => can(item.need)).map((item) => (
                 <SidebarNavButton
                   indicatorId="project-nav-indicator"
                   key={item.to}
@@ -252,7 +254,7 @@ export default function ProjectSidebar() {
                 label="Spaces"
                 open={spacesOpen}
                 onToggle={() => setSpacesOpen(!spacesOpen)}
-                action={
+                action={can('projects.create') && (
                   <button
                     onClick={() => navigate('/dashboard?new=1')}
                     title="New space"
@@ -260,7 +262,7 @@ export default function ProjectSidebar() {
                   >
                     <Plus size={12} />
                   </button>
-                }
+                )}
               />
               {spacesOpen && (
                 <div className="mt-0.5 space-y-0.5">

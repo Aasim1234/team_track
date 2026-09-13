@@ -15,6 +15,7 @@ import FailCommentModal from '../components/FailCommentModal'
 import { VMS_RESULT, TODO_TASK_STATUS } from '../lib/statusConfig'
 import { formatAuditTime } from '../lib/auditLog'
 import { formatCaseId } from '../lib/testCaseId'
+import { usePermissions } from '../hooks/usePermissions'
 
 // A task is an assigned test case, read straight from the test case itself, so
 // To-Do and the Test Plan grid always show the same assignment, result and
@@ -54,6 +55,9 @@ export default function TodoPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const toast = useToast()
+  // Your own tasks still need an execute permission to work on (Viewers can only look).
+  const { can } = usePermissions()
+  const canExecute = can('test_cases.execute') || can('test_cases.execute_any')
 
   const [project, setProject] = useState(null)
   const [tasks, setTasks] = useState([])
@@ -286,14 +290,14 @@ export default function TodoPage() {
               <>
                 <button
                   onClick={() => setTaskStatus('closed')}
-                  disabled={busy}
+                  disabled={busy || !canExecute}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-semibold text-gray-300 border border-gray-600 hover:bg-gray-700/50 disabled:opacity-40"
                 >
                   <XCircle size={13} /> Close Task
                 </button>
                 <button
                   onClick={() => setTaskStatus('completed')}
-                  disabled={busy || untested}
+                  disabled={busy || untested || !canExecute}
                   title={untested ? 'Record a result before completing the task' : undefined}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-semibold text-white bg-green-600 hover:bg-green-500 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-green-600"
                 >
@@ -303,7 +307,7 @@ export default function TodoPage() {
             ) : (
               <button
                 onClick={() => setTaskStatus('open')}
-                disabled={busy}
+                disabled={busy || !canExecute}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-semibold text-gray-300 border border-gray-600 hover:bg-gray-700/50 disabled:opacity-40"
               >
                 <RotateCcw size={13} /> Reopen Task
@@ -351,7 +355,7 @@ export default function TodoPage() {
                 <select
                   value={shown.result || 'not_tested'}
                   onChange={(e) => setResult(e.target.value)}
-                  disabled={busy}
+                  disabled={busy || !canExecute}
                   className={`w-40 text-[12px] font-semibold rounded-md border px-2 py-1 outline-none ${RESULT_CLASS[shown.result] || RESULT_CLASS.not_tested}`}
                 >
                   {Object.entries(VMS_RESULT).map(([key, cfg]) => (
@@ -362,7 +366,8 @@ export default function TodoPage() {
                   <button
                     onClick={() => setReasonFor({ status: shown.result, existing: shown.failure_comment || '' })}
                     title="Edit reason"
-                    className="flex items-start gap-1.5 text-left text-[12px] text-gray-300 hover:text-white min-w-0"
+                    disabled={!canExecute}
+                    className="flex items-start gap-1.5 text-left text-[12px] text-gray-300 hover:text-white min-w-0 disabled:pointer-events-none"
                   >
                     <MessageSquareWarning size={13} className={`mt-0.5 flex-shrink-0 ${shown.result === 'fail' ? 'text-red-400' : 'text-orange-400'}`} />
                     <span className="line-clamp-3">{shown.failure_comment || 'Add reason'}</span>
@@ -371,7 +376,9 @@ export default function TodoPage() {
               </div>
               {shown.task_status === 'open' && (
                 <p className="text-[11px] text-gray-500 mt-1.5">
-                  {untested
+                  {!canExecute
+                    ? "Your role can see this task but can't execute test cases. Ask an Admin if you need to."
+                    : untested
                     ? 'Run the test and record a result, then complete the task.'
                     : STAYS_OPEN_RESULTS.includes(shown.result)
                       ? 'This task stays open until you complete or close it.'

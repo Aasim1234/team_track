@@ -77,15 +77,17 @@ export default function AdminMemberProfilePage() {
         { data: resultRows },
         { data: sprintRows },
         { data: activityData },
+        { data: roleRows },
       ] = await Promise.all([
-        supabase.from('profiles').select('id, name, email').eq('id', memberId).single(),
+        supabase.from('profiles').select('id, name, email, role_id').eq('id', memberId).single(),
         supabase.from('project_members').select('project_id, role, projects(name, key)').eq('user_id', memberId),
         supabase.from('issues').select('id, title, type, status, assignee_id, reporter_id, due_date, created_at, updated_at, project_id, sprint_id'),
         fetchAllRows(() => supabase.from('test_results').select('id, executed_by, status, executed_at, elapsed_minutes').order('id')),
         supabase.from('sprints').select('id, project_id, status').eq('status', 'active'),
         supabase.from('activity_log').select('*').eq('actor_id', memberId).order('created_at', { ascending: false }).limit(500),
+        supabase.from('roles').select('id, name'),
       ])
-      setProfile(profileRow)
+      setProfile(profileRow ? { ...profileRow, role_name: (roleRows || []).find((r) => r.id === profileRow.role_id)?.name } : profileRow)
       setMemberships(memberRows || [])
       setIssues(issueRows || [])
       setResults(resultRows || [])

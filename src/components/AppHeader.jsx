@@ -7,7 +7,7 @@ import {
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
 import { useTheme } from '../hooks/useTheme'
-import { useProjectAdminAccess } from '../hooks/useProjectAdminAccess'
+import { usePermissions, ADMIN_AREA_PERMISSIONS } from '../hooks/usePermissions'
 import { getRecentIds, recordRecentProject } from '../lib/recentProjects'
 import Dropdown, { DropdownItem } from './ui/Dropdown'
 import NotificationBell from './NotificationBell'
@@ -20,7 +20,8 @@ export default function AppHeader({ breadcrumb = [], onQuickCreate, quickCreateL
   const { user } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
-  const { isAdmin: isProjectAdmin } = useProjectAdminAccess()
+  const { canAny, role } = usePermissions()
+  const canOpenAdmin = canAny(ADMIN_AREA_PERMISSIONS)
   const [recentProjects, setRecentProjects] = useState([])
 
   const loadRecent = async () => {
@@ -159,10 +160,10 @@ export default function AppHeader({ breadcrumb = [], onQuickCreate, quickCreateL
           {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
         </button>
 
-        {isProjectAdmin && (
+        {canOpenAdmin && (
           <button
             onClick={() => navigate('/admin')}
-            title="Admin"
+            title="Administration"
             className="text-gray-400 hover:text-white p-2 rounded-md hover:bg-gray-650"
           >
             <ShieldCheck size={16} />
@@ -180,6 +181,7 @@ export default function AppHeader({ breadcrumb = [], onQuickCreate, quickCreateL
           <div className="px-3.5 py-2.5 border-b border-gray-600">
             <p className="text-[13px] font-semibold text-white truncate">{displayName}</p>
             <p className="text-[11px] text-gray-500 truncate">{user?.email}</p>
+            {role && <p className="text-[11px] text-gray-400 mt-0.5">Role: <span className="text-white font-medium">{role.name}</span></p>}
           </div>
           <DropdownItem onClick={() => supabase.auth.signOut()} icon={LogOut} destructive>
             Logout

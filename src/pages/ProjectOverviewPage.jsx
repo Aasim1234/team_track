@@ -5,10 +5,8 @@ import { supabase } from '../lib/supabaseClient'
 import ProjectSidebar from '../components/ProjectSidebar'
 import AppHeader from '../components/AppHeader'
 import EnterpriseTable from '../components/ui/EnterpriseTable'
-import StatusBadge from '../components/ui/StatusBadge'
 import EmptyState from '../components/ui/EmptyState'
 import StatCard from '../components/ui/StatCard'
-import { PROJECT_MEMBER_ROLE } from '../lib/statusConfig'
 
 export default function ProjectOverviewPage() {
   const { id } = useParams()
@@ -17,24 +15,27 @@ export default function ProjectOverviewPage() {
   const [sectionCount, setSectionCount] = useState(0)
   const [caseCount, setCaseCount] = useState(0)
   const [members, setMembers] = useState([])
+  const [roleNames, setRoleNames] = useState({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true)
-      const [{ data: proj }, { count: suites }, { count: sections }, { count: cases }, { data: memberRows }] =
+      const [{ data: proj }, { count: suites }, { count: sections }, { count: cases }, { data: memberRows }, { data: roleRows }] =
         await Promise.all([
           supabase.from('projects').select('*').eq('id', id).single(),
           supabase.from('test_suites').select('id', { count: 'exact', head: true }).eq('project_id', id),
           supabase.from('sections').select('id', { count: 'exact', head: true }).eq('project_id', id),
           supabase.from('test_cases').select('id', { count: 'exact', head: true }).eq('project_id', id),
-          supabase.from('project_members').select('user_id, role, profiles(name, email)').eq('project_id', id),
+          supabase.from('project_members').select('user_id, profiles(name, email, role_id)').eq('project_id', id),
+          supabase.from('roles').select('id, name'),
         ])
       setProject(proj)
       setSuiteCount(suites || 0)
       setSectionCount(sections || 0)
       setCaseCount(cases || 0)
       setMembers(memberRows || [])
+      setRoleNames(Object.fromEntries((roleRows || []).map((r) => [r.id, r.name])))
       setLoading(false)
     }
     fetchData()
@@ -109,7 +110,7 @@ export default function ProjectOverviewPage() {
                   ),
                 },
                 { key: 'email', label: 'Email', render: (m) => m.profiles?.email || '—' },
-                { key: 'role', label: 'Role', render: (m) => <StatusBadge domain={PROJECT_MEMBER_ROLE} value={m.role} size="sm" /> },
+                { key: 'role', label: 'Role', render: (m) => <span className="text-[12px] font-medium text-gray-300">{roleNames[m.profiles?.role_id] || '—'}</span> },
               ]}
             />
           </div>

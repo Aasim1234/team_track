@@ -40,15 +40,19 @@ export default function AdminTeamPerformancePage() {
 
   useEffect(() => {
     const fetchAll = async () => {
-      const [{ data: issueRows }, { data: resultRows }, { data: memberRows }, { data: sprintRows }] = await Promise.all([
+      const [{ data: issueRows }, { data: resultRows }, { data: memberRows }, { data: sprintRows }, { data: roleRows }, { data: profileRoles }] = await Promise.all([
         supabase.from('issues').select('id, title, type, status, assignee_id, reporter_id, due_date, created_at, updated_at, project_id, sprint_id'),
         fetchAllRows(() => supabase.from('test_results').select('id, executed_by, status, executed_at, elapsed_minutes').order('id')),
         supabase.from('project_members').select('user_id, role, project_id, profiles(id, name, email), projects(name, key)'),
         supabase.from('sprints').select('id, project_id, status').eq('status', 'active'),
+        supabase.from('roles').select('id, name'),
+        supabase.from('profiles').select('id, role_id'),
       ])
       setIssues(issueRows || [])
       setResults(resultRows || [])
-      setMemberships(memberRows || [])
+      const roleName = Object.fromEntries((roleRows || []).map((r) => [r.id, r.name]))
+      const roleOf = Object.fromEntries((profileRoles || []).map((p) => [p.id, roleName[p.role_id]]))
+      setMemberships((memberRows || []).map((m) => (m.profiles ? { ...m, profiles: { ...m.profiles, role_name: roleOf[m.profiles.id] } } : m)))
       setSprints(sprintRows || [])
       setLoading(false)
     }

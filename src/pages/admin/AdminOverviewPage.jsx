@@ -29,11 +29,14 @@ export default function AdminOverviewPage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const [{ data: projectRows }, { count: users }, { count: admins }] = await Promise.all([
+      const [{ data: projectRows }, { count: users }, { data: adminRole }] = await Promise.all([
         supabase.from('projects').select('id, name, key, created_at').order('created_at', { ascending: false }).limit(5),
         supabase.from('profiles').select('id', { count: 'exact', head: true }),
-        supabase.from('project_members').select('user_id', { count: 'exact', head: true }).eq('role', 'admin'),
+        supabase.from('roles').select('id').eq('key', 'admin').maybeSingle(),
       ])
+      const { count: admins } = adminRole
+        ? await supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role_id', adminRole.id)
+        : { count: 0 }
       setProjects(projectRows || [])
       setUserCount(users || 0)
       setAdminCount(admins || 0)
@@ -58,7 +61,7 @@ export default function AdminOverviewPage() {
             <div className="grid grid-cols-3 gap-3 mb-6">
               <StatCard icon={FolderKanban} label="Total projects" value={projects.length === 5 ? '5+' : projects.length} />
               <StatCard icon={Users} label="Total users" value={userCount} />
-              <StatCard icon={ShieldCheck} label="Project admin roles" value={adminCount} />
+              <StatCard icon={ShieldCheck} label="Admins" value={adminCount} />
             </div>
           )}
 

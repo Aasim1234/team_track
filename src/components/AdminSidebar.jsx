@@ -4,6 +4,7 @@ import {
   SlidersHorizontal, Plug, Database, Settings, Gauge,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
+import { usePermissions, ADMIN_PAGE_PERMISSIONS } from '../hooks/usePermissions'
 import SidebarNavButton from './ui/SidebarNavButton'
 import SidebarFooter from './ui/SidebarFooter'
 
@@ -23,6 +24,9 @@ export default function AdminSidebar() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const { user } = useAuth()
+  const { canAny } = usePermissions()
+  // Only pages the user's role can open are listed.
+  const items = NAV_ITEMS.filter((item) => canAny(ADMIN_PAGE_PERMISSIONS[item.to]))
 
   return (
     <aside className="w-[216px] flex-shrink-0 bg-gray-800 border-r border-gray-600 h-screen sticky top-0 flex flex-col">
@@ -42,7 +46,7 @@ export default function AdminSidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
-        {NAV_ITEMS.map((item) => (
+        {items.map((item) => (
           <SidebarNavButton
             key={item.to}
             indicatorId="admin-nav-indicator"

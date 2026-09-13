@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useAuth } from './hooks/useAuth'
-import { useProjectAdminAccess } from './hooks/useProjectAdminAccess'
+import { PermissionsProvider, usePermissions, ADMIN_AREA_PERMISSIONS, ADMIN_PAGE_PERMISSIONS } from './hooks/usePermissions'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ProjectOverviewPage from './pages/ProjectOverviewPage'
@@ -11,6 +11,7 @@ import TestCoveragePage from './pages/TestCoveragePage'
 import TodoPage from './pages/TodoPage'
 import ReportsPage from './pages/ReportsPage'
 import CommandPalette from './components/CommandPalette'
+import NoAccessPage from './components/NoAccessPage'
 import { ToastProvider } from './components/ui/Toast'
 import AdminOverviewPage from './pages/admin/AdminOverviewPage'
 import AdminProjectsPage from './pages/admin/AdminProjectsPage'
@@ -39,27 +40,37 @@ function PageTransition({ children }) {
   )
 }
 
-function ProtectedRoute({ children }) {
+function Loading() {
+  return <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">Loading...</div>
+}
+
+// Signed-in pages. `need` lists permissions of which the user must have at
+// least one; without them the page is replaced by a "no access" message. The
+// database enforces the same permissions on every request regardless.
+function ProtectedRoute({ children, need, title }) {
   const { user, loading } = useAuth()
-  if (loading) return <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">Loading...</div>
+  const { loading: permissionsLoading, canAny } = usePermissions()
+  if (loading || (user && need && permissionsLoading)) return <Loading />
   if (!user) return <Navigate to="/login" replace />
+  if (need && !canAny(need)) return <PageTransition><NoAccessPage title={title} /></PageTransition>
   return <PageTransition>{children}</PageTransition>
 }
 
-function AdminRoute({ children }) {
-  const { user, loading: authLoading } = useAuth()
-  const { isAdmin, loading: adminLoading } = useProjectAdminAccess()
-  if (authLoading || adminLoading) {
-    return <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">Loading...</div>
-  }
+// Administration pages: the area needs any admin-type permission, and each
+// page its own (see ADMIN_PAGE_PERMISSIONS).
+function AdminRoute({ children, page = '/admin' }) {
+  const { user, loading } = useAuth()
+  const { loading: permissionsLoading, canAny } = usePermissions()
+  if (loading || (user && permissionsLoading)) return <Loading />
   if (!user) return <Navigate to="/login" replace />
-  if (!isAdmin) return <Navigate to="/dashboard" replace />
+  if (!canAny(ADMIN_AREA_PERMISSIONS)) return <Navigate to="/dashboard" replace />
+  if (!canAny(ADMIN_PAGE_PERMISSIONS[page])) return <Navigate to="/admin" replace />
   return <PageTransition>{children}</PageTransition>
 }
 
 function PublicRoute({ children }) {
   const { user, loading } = useAuth()
-  if (loading) return <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">Loading...</div>
+  if (loading) return <Loading />
   if (user) return <Navigate to="/dashboard" replace />
   return <PageTransition>{children}</PageTransition>
 }
@@ -88,7 +99,7 @@ function AnimatedRoutes() {
         <Route
           path="/coverage"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute need={['reports.view']} title="Test Coverage">
               <TestCoveragePage />
             </ProtectedRoute>
           }
@@ -104,7 +115,7 @@ function AnimatedRoutes() {
         <Route
           path="/admin/projects"
           element={
-            <AdminRoute>
+            <AdminRoute page="/admin/projects">
               <AdminProjectsPage />
             </AdminRoute>
           }
@@ -112,7 +123,7 @@ function AnimatedRoutes() {
         <Route
           path="/admin/users"
           element={
-            <AdminRoute>
+            <AdminRoute page="/admin/users">
               <AdminUsersRolesPage />
             </AdminRoute>
           }
@@ -120,7 +131,7 @@ function AnimatedRoutes() {
         <Route
           path="/admin/team-performance"
           element={
-            <AdminRoute>
+            <AdminRoute page="/admin/team-performance">
               <AdminTeamPerformancePage />
             </AdminRoute>
           }
@@ -128,7 +139,7 @@ function AnimatedRoutes() {
         <Route
           path="/admin/team-performance/:memberId"
           element={
-            <AdminRoute>
+            <AdminRoute page="/admin/team-performance">
               <AdminMemberProfilePage />
             </AdminRoute>
           }
@@ -136,7 +147,7 @@ function AnimatedRoutes() {
         <Route
           path="/admin/ai-hub"
           element={
-            <AdminRoute>
+            <AdminRoute page="/admin/ai-hub">
               <AdminAiHubPage />
             </AdminRoute>
           }
@@ -144,7 +155,7 @@ function AnimatedRoutes() {
         <Route
           path="/admin/customizations"
           element={
-            <AdminRoute>
+            <AdminRoute page="/admin/customizations">
               <AdminCustomizationsPage />
             </AdminRoute>
           }
@@ -152,7 +163,7 @@ function AnimatedRoutes() {
         <Route
           path="/admin/integration"
           element={
-            <AdminRoute>
+            <AdminRoute page="/admin/integration">
               <AdminIntegrationPage />
             </AdminRoute>
           }
@@ -160,7 +171,7 @@ function AnimatedRoutes() {
         <Route
           path="/admin/data-management"
           element={
-            <AdminRoute>
+            <AdminRoute page="/admin/data-management">
               <AdminDataManagementPage />
             </AdminRoute>
           }
@@ -168,7 +179,7 @@ function AnimatedRoutes() {
         <Route
           path="/admin/site-settings"
           element={
-            <AdminRoute>
+            <AdminRoute page="/admin/site-settings">
               <AdminSiteSettingsPage />
             </AdminRoute>
           }
@@ -180,7 +191,7 @@ function AnimatedRoutes() {
         <Route
           path="/project/:id/overview"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute need={['projects.view']} title="Project Overview">
               <ProjectOverviewPage />
             </ProtectedRoute>
           }
@@ -188,7 +199,7 @@ function AnimatedRoutes() {
         <Route
           path="/project/:id/plans"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute need={['test_plans.view']} title="VMS Test Plans">
               <VmsTestPlansPage />
             </ProtectedRoute>
           }
@@ -196,7 +207,7 @@ function AnimatedRoutes() {
         <Route
           path="/project/:id/plans/:planId"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute need={['test_plans.view']} title="VMS Test Plans">
               <VmsTestPlansPage />
             </ProtectedRoute>
           }
@@ -204,7 +215,7 @@ function AnimatedRoutes() {
         <Route
           path="/project/:id/reports"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute need={['reports.view']} title="Reports">
               <ReportsPage />
             </ProtectedRoute>
           }
@@ -212,7 +223,7 @@ function AnimatedRoutes() {
         <Route
           path="/project/:id/todo"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute need={['test_cases.view']} title="To-Do">
               <TodoPage />
             </ProtectedRoute>
           }
@@ -220,7 +231,7 @@ function AnimatedRoutes() {
         <Route
           path="/project/:id/activity"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute need={['admin.audit_logs']} title="the Activity Log">
               <ActivityLogPage />
             </ProtectedRoute>
           }
@@ -234,10 +245,12 @@ function AnimatedRoutes() {
 function App() {
   return (
     <ToastProvider>
-      <BrowserRouter>
-        <CommandPalette />
-        <AnimatedRoutes />
-      </BrowserRouter>
+      <PermissionsProvider>
+        <BrowserRouter>
+          <CommandPalette />
+          <AnimatedRoutes />
+        </BrowserRouter>
+      </PermissionsProvider>
     </ToastProvider>
   )
 }

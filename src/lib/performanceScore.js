@@ -28,7 +28,8 @@ export function timeAgo(dateStr) {
 // used by both the Team Performance list/leaderboard and the per-member
 // profile page so the numbers never drift between the two views.
 export function computeMemberStats(profile, mems, { issues, results, activeSprintIds }) {
-  const role = mems.reduce((best, m) => (ROLE_RANK[m.role] > ROLE_RANK[best] ? m.role : best), 'viewer')
+  // The app-wide role when known (Users & Roles); older data falls back to the strongest project role.
+  const role = profile.role_name || mems.reduce((best, m) => (ROLE_RANK[m.role] > ROLE_RANK[best] ? m.role : best), 'viewer')
   const myIssues = issues.filter((i) => i.assignee_id === profile.id)
   const myBugsReported = issues.filter((i) => i.type === 'bug' && i.reporter_id === profile.id)
   const myBugsFixed = issues.filter((i) => i.type === 'bug' && i.assignee_id === profile.id && i.status === 'done')

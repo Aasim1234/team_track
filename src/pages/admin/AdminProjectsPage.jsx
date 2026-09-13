@@ -11,11 +11,13 @@ import Modal from '../../components/ui/Modal'
 import FormField, { inputClass } from '../../components/ui/FormField'
 import PrimaryButton from '../../components/ui/Button'
 import { useToast } from '../../components/ui/Toast'
+import { usePermissions } from '../../hooks/usePermissions'
 
 export default function AdminProjectsPage() {
   const { user } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
+  const { can } = usePermissions()
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -75,7 +77,8 @@ export default function AdminProjectsPage() {
 
   const handleDelete = async () => {
     if (deleteConfirmText !== deleteTarget.key) return
-    await supabase.from('projects').delete().eq('id', deleteTarget.id)
+    const { error } = await supabase.from('projects').delete().eq('id', deleteTarget.id)
+    if (error) { toast.error(error.message); return }
     setDeleteTarget(null)
     setDeleteConfirmText('')
     fetchProjects()
@@ -89,14 +92,14 @@ export default function AdminProjectsPage() {
         <PageHeader
           title="Projects"
           subtitle="Every project in this workspace"
-          actions={
+          actions={can('projects.create') && (
             <button
               onClick={() => setShowCreate(true)}
               className="flex items-center gap-1.5 bg-blue-500 hover:bg-blue-400 text-white px-3 py-1.5 rounded-md text-[12px] font-semibold"
             >
               <Plus size={14} /> Add Project
             </button>
-          }
+          )}
         />
 
         <div className="p-6">
@@ -133,20 +136,24 @@ export default function AdminProjectsPage() {
                 width: '90px',
                 render: (p) => (
                   <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => setEditing({ ...p })}
-                      title="Edit"
-                      className="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-650"
-                    >
-                      <Pencil size={13} />
-                    </button>
-                    <button
-                      onClick={() => setDeleteTarget(p)}
-                      title="Delete"
-                      className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-gray-650"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    {can('projects.edit') && (
+                      <button
+                        onClick={() => setEditing({ ...p })}
+                        title="Edit"
+                        className="text-gray-400 hover:text-white p-1 rounded hover:bg-gray-650"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                    )}
+                    {can('projects.delete') && (
+                      <button
+                        onClick={() => setDeleteTarget(p)}
+                        title="Delete"
+                        className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-gray-650"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
                 ),
               },

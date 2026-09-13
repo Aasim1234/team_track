@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabaseClient'
 import { fetchAllRows } from '../lib/fetchAllRows'
 import { summarizeRunCases, formatPercent } from '../lib/testMetrics'
 import { useAuth } from '../hooks/useAuth'
+import { usePermissions } from '../hooks/usePermissions'
 import ProjectSidebar from '../components/ProjectSidebar'
 import AppHeader from '../components/AppHeader'
 import PageHeader from '../components/PageHeader'
@@ -45,18 +46,14 @@ export default function VmsTestPlansPage() {
   const [runs, setRuns] = useState([])
   const [statusRows, setStatusRows] = useState([])
   const [members, setMembers] = useState([])
-  const [myRole, setMyRole] = useState(null)
   const [loading, setLoading] = useState(true)
   const [showNewPlan, setShowNewPlan] = useState(false)
   const [showExport, setShowExport] = useState(false)
 
-  const canAuthor = ['admin', 'lead', 'tester'].includes(myRole)
-  const canDelete = ['admin', 'lead'].includes(myRole)
-  // Admins and Leads may override someone else's test case assignment.
-  const canManageAssignments = ['admin', 'lead'].includes(myRole)
+  const { can } = usePermissions()
 
   const fetchAll = async () => {
-    const [{ data: proj }, { data: planRows }, { data: runRows }, { data: statusData }, { data: memberRows }, { data: roleRow }] =
+    const [{ data: proj }, { data: planRows }, { data: runRows }, { data: statusData }, { data: memberRows }] =
       await Promise.all([
         supabase.from('projects').select('*').eq('id', projectId).single(),
         supabase
@@ -68,16 +65,12 @@ export default function VmsTestPlansPage() {
         fetchAllRows(() =>
           supabase.from('test_run_case_current_status').select('run_id, current_status, run_case_id').eq('project_id', projectId).order('run_case_id')),
         supabase.from('project_members').select('user_id, profiles(id, name)').eq('project_id', projectId),
-        user
-          ? supabase.from('project_members').select('role').eq('project_id', projectId).eq('user_id', user.id).maybeSingle()
-          : Promise.resolve({ data: null }),
       ])
     setProject(proj)
     setPlans(planRows || [])
     setRuns(runRows || [])
     setStatusRows(statusData || [])
     setMembers((memberRows || []).map((m) => m.profiles).filter(Boolean))
-    setMyRole(roleRow?.role || null)
     setLoading(false)
   }
 
@@ -105,9 +98,6 @@ export default function VmsTestPlansPage() {
         runs={runs}
         statusRows={statusRows}
         members={members}
-        canAuthor={canAuthor}
-        canDelete={canDelete}
-        canManageAssignments={canManageAssignments}
         userId={user?.id}
         onRefreshList={fetchAll}
       />
@@ -138,13 +128,15 @@ export default function VmsTestPlansPage() {
           subtitle="Review, maintain and export your VMS test plan"
           actions={
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowExport(true)}
-                className="flex items-center gap-1.5 border border-gray-700 hover:border-gray-600 text-gray-300 hover:text-white px-3 py-1.5 rounded-md text-[12px] font-semibold"
-              >
-                <Download size={14} /> Export Excel
-              </button>
-              {canAuthor && (
+              {can('reports.export') && (
+                <button
+                  onClick={() => setShowExport(true)}
+                  className="flex items-center gap-1.5 border border-gray-700 hover:border-gray-600 text-gray-300 hover:text-white px-3 py-1.5 rounded-md text-[12px] font-semibold"
+                >
+                  <Download size={14} /> Export Excel
+                </button>
+              )}
+              {can('test_plans.create') && (
                 <button
                   onClick={() => setShowNewPlan(true)}
                   className="flex items-center gap-1.5 bg-blue-500 hover:bg-blue-400 text-white px-3 py-1.5 rounded-md text-[12px] font-semibold"
@@ -167,7 +159,7 @@ export default function VmsTestPlansPage() {
                 title="No test plans yet"
                 description="Create a plan to bundle test runs for a release and track your VMS test scenarios in one place."
                 action={
-                  canAuthor && (
+                  can('test_plans.create') && (
                     <button
                       onClick={() => setShowNewPlan(true)}
                       className="bg-blue-500 hover:bg-blue-400 text-white px-4 py-2 rounded-md text-[13px] font-semibold"
@@ -228,8 +220,9 @@ export default function VmsTestPlansPage() {
   )
 }
 
-function TestPlanDetail({ projectId, planId, project, runs, statusRows, members, canAuthor, canDelete, canManageAssignments, userId, onRefreshList }) {
+function TestPlanDetail({ projectId, planId, project, runs, statusRows, members, userId, onRefreshList }) {
   const navigate = useNavigate()
+  const { can } = usePermissions()
   // ?case=<test case id> opens the plan at that test case.
   const [searchParams] = useSearchParams()
   const [showExport, setShowExport] = useState(false)
@@ -322,16 +315,26 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
           subtitle={plan.description || `Created by ${plan.creator?.name || 'someone'}`}
           actions={
             <div className="flex items-center gap-2">
-              {canAuthor && (
+              {(can('test_plans.edit') || can('test_plans.close')) && (
                 <select
                   value={plan.status}
                   onChange={(e) => setPlanStatus(e.target.value)}
-                  className="text-[12px] bg-gray-700 border border-gray-600 rounded-md px-2 py-1.5 outline-none"
+                  disabled={plan.status === 'completed' && !can('test_plans.close')}
+                  className="text-[12px] bg-gray-700 border border-gray-600 rounded-md px-2 py-1.5 outline-none disabled:opacity-60"
                 >
-                  {Object.entries(TEST_PLAN_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                  {/* Completing or reopening needs Complete/Close Test Plan; other changes need Edit Test Plan. */}
+                  {Object.entries(TEST_PLAN_STATUS).map(([k, v]) => (
+                    <option
+                      key={k}
+                      value={k}
+                      disabled={k !== plan.status && ((k === 'completed' || plan.status === 'completed') ? !can('test_plans.close') : !can('test_plans.edit'))}
+                    >
+                      {v.label}
+                    </option>
+                  ))}
                 </select>
               )}
-              {canAuthor && (
+              {can('test_plans.edit') && (
                 <button
                   onClick={() => setShowEdit(true)}
                   className="flex items-center gap-1.5 border border-gray-600 hover:bg-gray-650 text-gray-300 px-3 py-1.5 rounded-md text-[12px] font-semibold"
@@ -339,12 +342,14 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
                   <Pencil size={13} /> Edit
                 </button>
               )}
-              <button
-                onClick={() => setShowExport(true)}
-                className="flex items-center gap-1.5 bg-blue-500 hover:bg-blue-400 text-white px-3 py-1.5 rounded-md text-[12px] font-semibold"
-              >
-                <Download size={14} /> Export Excel
-              </button>
+              {can('reports.export') && (
+                <button
+                  onClick={() => setShowExport(true)}
+                  className="flex items-center gap-1.5 bg-blue-500 hover:bg-blue-400 text-white px-3 py-1.5 rounded-md text-[12px] font-semibold"
+                >
+                  <Download size={14} /> Export Excel
+                </button>
+              )}
             </div>
           }
         />
@@ -368,7 +373,7 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
           <BentoCard className="p-4">
             <div className="flex items-center justify-between mb-3">
               <p className="text-[13px] font-semibold text-white">Linked Test Runs</p>
-              {canAuthor && (
+              {can('test_runs.edit') && (
                 <Dropdown
                   align="right"
                   trigger={
@@ -399,7 +404,7 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
                   <div className="flex-1 min-w-[140px]">
                     <StatusProgressBar domain={TEST_RUN_RESULT} counts={perRunCounts[r.id] || countsFor([])} />
                   </div>
-                  {canAuthor && (
+                  {can('test_runs.edit') && (
                     <button onClick={() => detachRun(r.id)} title="Detach from plan" className="text-gray-500 hover:text-red-500 flex-shrink-0">
                       <Unlink size={14} />
                     </button>
@@ -418,8 +423,6 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
             <VmsPlanGrid
               planId={planId}
               projectId={projectId}
-              canAuthor={canAuthor}
-              canManageAssignments={canManageAssignments}
               userId={userId}
               members={members}
               focusRowId={searchParams.get('case')}
