@@ -175,12 +175,12 @@ body::before {
    COMPONENT UTILITIES
    ============================================ */
 @layer components {
-  /* Real translucent glass — scoped deliberately narrow: only the floating,
-     above-a-scrim surfaces (Modal, SidePanel, Dropdown, Toast, CommandPalette).
-     Bento cards and tables stay solid + shadow-lg — no blur — so "glass"
-     keeps meaning "floating" and doesn't get diluted into generic decoration. */
+  /* Floating surfaces (Modal, SidePanel, Toast, CommandPalette, Login card).
+     Solid on purpose: these sit inside an animated scrim, which stops the
+     backdrop blur from reaching the page, so any translucency let the text
+     behind show straight through the dialog. */
   .glass {
-    background: color-mix(in srgb, var(--color-gray-800) 72%, transparent);
+    background: var(--color-gray-800);
     backdrop-filter: blur(20px) saturate(140%);
     -webkit-backdrop-filter: blur(20px) saturate(140%);
     border: 1px solid color-mix(in srgb, var(--color-gray-600) 60%, transparent);

@@ -9,7 +9,7 @@ export default function Modal({ open, onClose, title, children, footer, size = '
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
           onClick={onClose}
           initial="initial"
           animate="animate"
