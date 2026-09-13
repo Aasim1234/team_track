@@ -18,6 +18,10 @@ const RESULT_CLASS = {
 const REASON_RESULTS = ['fail', 'blocked']
 const REASON_ICON_CLASS = { fail: 'text-red-400/70', blocked: 'text-orange-400/70' }
 
+// Assignment and its To-Do task are kept together by the database.
+const ASSIGNMENT_FIELDS = 'assigned_to, assigned_at, assigned_by, task_status, task_status_at'
+const TASK_SUFFIX = { completed: ' · Completed', closed: ' · Closed' }
+
 // The fields a row's Edit button unlocks. RESULT is deliberately not one of
 // them — recording a result has to stay a single click.
 const EDITABLE = ['topic', 'scenario', 'test_steps', 'expected_result']
@@ -194,11 +198,11 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAss
       .update({ assigned_to: userId })
       .eq('id', row.id)
       .is('assigned_to', null)
-      .select('assigned_to, assigned_at')
+      .select(ASSIGNMENT_FIELDS)
     if (error) { toast.error(error.message); fetchRows(); return }
     if (!data?.length) { toast.error('Someone else has just taken this test case.'); fetchRows(); return }
     applyRow(row.id, { ...data[0], assignee: { id: userId, name: memberNames[userId] } })
-    toast.success('Assigned to you')
+    toast.success('Assigned to you — added to your To-Do')
   }
 
   const releaseMine = async (row) => {
@@ -208,7 +212,7 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAss
       .update({ assigned_to: null })
       .eq('id', row.id)
       .eq('assigned_to', userId)
-      .select('assigned_to, assigned_at')
+      .select(ASSIGNMENT_FIELDS)
     if (error || !data?.length) {
       toast.error(error?.message || 'This test case is no longer assigned to you.')
       fetchRows()
@@ -230,7 +234,7 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAss
       .from('vms_test_plan_rows')
       .update({ assigned_to: to })
       .eq('id', row.id)
-      .select('assigned_to, assigned_at')
+      .select(ASSIGNMENT_FIELDS)
     if (error || !data?.length) { toast.error(error?.message || 'Could not change the assignment.'); fetchRows(); return }
     applyRow(row.id, { ...data[0], assignee: to ? { id: to, name: memberNames[to] } : null })
     toast.success(to ? `Reassigned to ${to === userId ? 'you' : memberNames[to]}` : 'Assignment removed')
@@ -314,7 +318,7 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAss
       return (
         <div className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-blue-400 bg-blue-500/10 border border-blue-500/30 rounded px-1.5 py-0.5">
           <UserCheck size={11} className="flex-shrink-0" />
-          <span className="truncate flex-1">Assigned to you</span>
+          <span className="truncate flex-1">Assigned to you{TASK_SUFFIX[row.task_status] || ''}</span>
           <button onClick={() => releaseMine(row)} title="Unassign yourself" className="text-blue-400/70 hover:text-blue-300 flex-shrink-0">
             <X size={10} />
           </button>
@@ -330,7 +334,7 @@ export default function VmsPlanGrid({ planId, projectId, canAuthor, canManageAss
           className="mt-1 flex items-center gap-1 text-[10px] font-semibold text-amber-500 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-0.5"
         >
           <Lock size={10} className="flex-shrink-0" />
-          <span className="truncate">Assigned to {name}</span>
+          <span className="truncate">Assigned to {name}{TASK_SUFFIX[row.task_status] || ''}</span>
         </div>
         {canManageAssignments && (
           <select

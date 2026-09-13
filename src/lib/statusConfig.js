@@ -120,3 +120,10 @@ export const VMS_RESULT = {
   retest: { label: 'Retest', color: 'purple' },
   na: { label: 'N/A', color: 'gray' },
 }
+
+// The To-Do task for an assigned test case (vms_test_plan_rows.task_status).
+export const TODO_TASK_STATUS = {
+  open: { label: 'Open', color: 'blue' },
+  completed: { label: 'Completed', color: 'green' },
+  closed: { label: 'Closed', color: 'gray' },
+}
