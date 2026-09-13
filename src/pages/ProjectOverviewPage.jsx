@@ -85,8 +85,8 @@ export default function ProjectOverviewPage() {
               their creation time, each opening its plan). Deliberately not
               connected to test cases, assignments or To-Do. Empty until then. */}
           <div className="bg-gray-800 border border-gray-600 rounded-lg p-5 mb-6">
-            <p className="text-[13px] font-semibold text-white mb-3">Recently added test plans</p>
-            <p className="px-2.5 py-2 text-[13px] text-gray-500">No recently added test plans.</p>
+            <p className="text-[13px] font-semibold text-white mb-3">Recently added test cases in test plan</p>
+            <p className="px-2.5 py-2 text-[13px] text-gray-500">No recently added test cases in test plan.</p>
           </div>
 
           <div>
