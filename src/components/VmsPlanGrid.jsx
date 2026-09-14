@@ -77,6 +77,10 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
   // Bulk assignment (Assign Test Case permission): the ticked test cases.
   const [selected, setSelected] = useState(() => new Set())
   const [bulkOpen, setBulkOpen] = useState(false)
+  // Assign Section: the Topic whose test cases are being assigned (kept while the dialog closes).
+  const [sectionFor, setSectionFor] = useState(null)
+  const lastSectionRef = useRef(null)
+  if (sectionFor) lastSectionRef.current = sectionFor
   // Kept after close so the dialog doesn't switch colours while it animates out.
   const reasonStatusRef = useRef('fail')
   if (reasonFor) reasonStatusRef.current = reasonFor.status
@@ -357,6 +361,11 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
     return next
   })
 
+  // A section is every test case in this plan under the same Topic (the database uses the same rule).
+  const sectionKey = (topic) => (topic || '').trim().toLowerCase()
+  const shownSection = sectionFor || lastSectionRef.current
+  const sectionRows = shownSection ? rows.filter((r) => sectionKey(r.topic) === sectionKey(shownSection)) : []
+
   const readClass = 'px-1.5 py-0.5 text-[12px] leading-[1.4] whitespace-pre-wrap break-words'
   const editClass =
     'w-full bg-gray-900 border border-gray-600 focus:border-blue-500 text-[12px] text-gray-100 leading-[1.4] resize-none outline-none rounded px-1.5 py-0.5 whitespace-pre-wrap block'
@@ -577,7 +586,20 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
                     {editing
                       ? editCell('topic', 'font-semibold', true)
                       : newTopic
-                        ? readCell(row.topic, 'font-semibold text-white')
+                        ? (
+                          <>
+                            {readCell(row.topic, 'font-semibold text-white')}
+                            {canAssign && sectionKey(row.topic) && (
+                              <button
+                                onClick={() => setSectionFor(row.topic.trim())}
+                                title={`Assign every test case in "${row.topic.trim()}"`}
+                                className="ml-1.5 flex items-center gap-1 text-[10px] font-medium text-blue-400 hover:text-blue-300"
+                              >
+                                <UserPlus size={10} /> Assign section
+                              </button>
+                            )}
+                          </>
+                        )
                         : <span className="block px-1.5 py-0.5 text-[12px] text-gray-600">↳</span>}
                   </td>
                   <td className="px-1 py-0.5">
@@ -696,6 +718,19 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
           members={members}
           userId={userId}
           onAssigned={() => { setBulkOpen(false); setSelected(new Set()); fetchRows() }}
+        />
+      )}
+
+      {canAssign && (
+        <BulkAssignModal
+          open={Boolean(sectionFor)}
+          onClose={() => setSectionFor(null)}
+          section={shownSection}
+          planId={planId}
+          rows={sectionRows}
+          members={members}
+          userId={userId}
+          onAssigned={() => { setSectionFor(null); fetchRows() }}
         />
       )}
     </div>

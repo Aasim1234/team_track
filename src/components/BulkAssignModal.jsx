@@ -9,10 +9,12 @@ import { formatCaseId } from '../lib/testCaseId'
 
 const PREVIEW_LIMIT = 8
 
-// Assigns every selected test case to one person in a single database
-// operation (bulk_assign_test_cases), which checks the same permissions as a
-// single assignment and turns each test case into its own To-Do task.
-export default function BulkAssignModal({ open, onClose, rows, members, userId, onAssigned }) {
+// Assigns a set of test cases to one person in a single database operation,
+// which checks the same permissions as a single assignment and turns each
+// test case into its own To-Do task. Used for ticked test cases
+// (bulk_assign_test_cases) and for a whole section (assign_test_section, when
+// `section` is given; the database decides which test cases belong to it).
+export default function BulkAssignModal({ open, onClose, rows, members, userId, onAssigned, section, planId }) {
   const toast = useToast()
   const [assignee, setAssignee] = useState('')
   const [reassign, setReassign] = useState(false)
@@ -51,11 +53,18 @@ export default function BulkAssignModal({ open, onClose, rows, members, userId, 
     }
 
     setSaving(true)
-    const { data, error } = await supabase.rpc('bulk_assign_test_cases', {
-      p_row_ids: rows.map((r) => r.id),
-      p_assignee: assignee,
-      p_include_assigned: reassign,
-    })
+    const { data, error } = section
+      ? await supabase.rpc('assign_test_section', {
+        p_plan_id: planId,
+        p_section: section,
+        p_assignee: assignee,
+        p_include_assigned: reassign,
+      })
+      : await supabase.rpc('bulk_assign_test_cases', {
+        p_row_ids: rows.map((r) => r.id),
+        p_assignee: assignee,
+        p_include_assigned: reassign,
+      })
     setSaving(false)
     if (error) {
       toast.error(error.message)
@@ -68,14 +77,23 @@ export default function BulkAssignModal({ open, onClose, rows, members, userId, 
       data?.unchanged ? `${data.unchanged} ${data.unchanged === 1 ? 'was' : 'were'} already assigned to ${data.assignee}` : null,
     ].filter(Boolean)
     toast.success(
-      `${done} test case${plural(done)} assigned successfully to ${data?.assignee || assigneeName}.` +
+      `${done} test case${plural(done)}${section ? ` in "${data?.section || section}"` : ''} assigned successfully to ${data?.assignee || assigneeName}.` +
       (notes.length ? ` ${notes.join('; ')}.` : ''))
     onAssigned()
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={`Assign ${rows.length} Test Case${plural(rows.length)}`} size="lg">
+    <Modal open={open} onClose={onClose} title={section ? 'Assign Section' : `Assign ${rows.length} Test Case${plural(rows.length)}`} size="lg">
       <form onSubmit={submit} className="space-y-3.5">
+        {section && (
+          <div className="rounded-md border border-gray-700 px-3 py-2.5">
+            <p className="text-[11px] text-gray-500 uppercase tracking-wide">Section</p>
+            <p className="text-[15px] font-semibold text-white">{section}</p>
+            <p className="text-[12px] text-gray-400 mt-0.5">
+              {rows.length} test case{plural(rows.length)} in this section of the test plan
+            </p>
+          </div>
+        )}
         <FormField label="Assign to" required>
           <select value={assignee} onChange={(e) => setAssignee(e.target.value)} required autoFocus className={inputClass}>
             <option value="">Choose a person…</option>
@@ -105,7 +123,7 @@ export default function BulkAssignModal({ open, onClose, rows, members, userId, 
         {taken.length > 0 && (
           <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 space-y-2">
             <p className="flex items-center gap-1.5 text-[12px] font-semibold text-amber-500">
-              <AlertTriangle size={13} /> {taken.length} selected test case{plural(taken.length)} already {taken.length === 1 ? 'has' : 'have'} an assignee
+              <AlertTriangle size={13} /> {taken.length} {section ? '' : 'selected '}test case{plural(taken.length)}{section ? ' in this section' : ''} already {taken.length === 1 ? 'has' : 'have'} an assignee
             </p>
             <ul className="space-y-0.5 text-[11px] text-gray-400">
               {taken.slice(0, PREVIEW_LIMIT).map((r) => (
