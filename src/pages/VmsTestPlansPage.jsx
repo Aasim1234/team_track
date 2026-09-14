@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, ArrowLeft, ClipboardList, Link2, Unlink, Trash2, Pencil, Download } from 'lucide-react'
+import { Plus, ArrowLeft, ClipboardList, Link2, Unlink, Trash2, Pencil, Download, Tag } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { fetchAllRows } from '../lib/fetchAllRows'
 import { summarizeRunCases, formatPercent } from '../lib/testMetrics'
@@ -10,6 +10,7 @@ import ProjectSidebar from '../components/ProjectSidebar'
 import AppHeader from '../components/AppHeader'
 import PageHeader from '../components/PageHeader'
 import NewTestPlanModal from '../components/NewTestPlanModal'
+import { ReleaseBadge, ChangeReleaseModal, ManageReleasesModal, sortReleases } from '../components/ReleaseVersions'
 import ExportTestPlanModal from '../components/ExportTestPlanModal'
 import VmsPlanGrid from '../components/VmsPlanGrid'
 import EnterpriseTable from '../components/ui/EnterpriseTable'
@@ -49,28 +50,33 @@ export default function VmsTestPlansPage() {
   const [loading, setLoading] = useState(true)
   const [showNewPlan, setShowNewPlan] = useState(false)
   const [showExport, setShowExport] = useState(false)
+  const [releases, setReleases] = useState([])
+  const [releaseFilter, setReleaseFilter] = useState('all')   // 'all' | release id | 'none'
+  const [showReleases, setShowReleases] = useState(false)
 
   const { can } = usePermissions()
 
   const fetchAll = async () => {
-    const [{ data: proj }, { data: planRows }, { data: runRows }, { data: statusData }, { data: memberRows }] =
+    const [{ data: proj }, { data: planRows }, { data: runRows }, { data: statusData }, { data: memberRows }, { data: releaseRows }] =
       await Promise.all([
         supabase.from('projects').select('*').eq('id', projectId).single(),
         supabase
           .from('test_plans')
-          .select('*, owner:profiles!owner_id(id, name), creator:profiles!created_by(name)')
+          .select('*, owner:profiles!owner_id(id, name), creator:profiles!created_by(name), release:release_versions(id, name)')
           .eq('project_id', projectId)
           .order('created_at', { ascending: false }),
         supabase.from('test_runs').select('id, name, status, test_plan_id').eq('project_id', projectId),
         fetchAllRows(() =>
           supabase.from('test_run_case_current_status').select('run_id, current_status, run_case_id').eq('project_id', projectId).order('run_case_id')),
         supabase.from('project_members').select('user_id, profiles(id, name)').eq('project_id', projectId),
+        supabase.from('release_versions').select('id, name, created_at').eq('project_id', projectId),
       ])
     setProject(proj)
     setPlans(planRows || [])
     setRuns(runRows || [])
     setStatusRows(statusData || [])
     setMembers((memberRows || []).map((m) => m.profiles).filter(Boolean))
+    setReleases(releaseRows || [])
     setLoading(false)
   }
 
@@ -98,6 +104,7 @@ export default function VmsTestPlansPage() {
         runs={runs}
         statusRows={statusRows}
         members={members}
+        releases={releases}
         userId={user?.id}
         onRefreshList={fetchAll}
       />
@@ -118,6 +125,37 @@ export default function VmsTestPlansPage() {
 
   const runCountForPlan = (planId) => runs.filter((r) => r.test_plan_id === planId).length
 
+  // Test plans grouped under their release version, newest release first; plans
+  // not yet linked to a release come last.
+  const unversioned = plans.filter((p) => !p.release_version_id)
+  const planGroups = [
+    ...sortReleases(releases).map((r) => ({ key: r.id, name: r.name, plans: plans.filter((p) => p.release_version_id === r.id) })),
+    { key: 'none', name: null, plans: unversioned },
+  ].filter((g) => g.plans.length > 0 && (releaseFilter === 'all' || releaseFilter === g.key))
+
+  const planColumns = [
+    {
+      key: 'name',
+      label: 'Plan',
+      render: (p) => (
+        <div>
+          <span className="text-white font-medium">{p.name}</span>
+          {p.description && <p className="text-[11px] text-gray-500 truncate max-w-xs">{p.description}</p>}
+        </div>
+      ),
+    },
+    { key: 'status', label: 'Status', width: '120px', render: (p) => <StatusBadge domain={TEST_PLAN_STATUS} value={p.status} /> },
+    { key: 'runs', label: 'Runs', width: '80px', render: (p) => runCountForPlan(p.id) },
+    {
+      key: 'progress',
+      label: 'Progress',
+      width: '220px',
+      render: (p) => <StatusProgressBar domain={TEST_RUN_RESULT} counts={perPlanCounts[p.id] || countsFor([])} />,
+    },
+    { key: 'owner', label: 'Owner', width: '160px', render: (p) => p.owner?.name || '—' },
+    { key: 'target_date', label: 'Target Date', width: '130px', render: (p) => p.target_date ? new Date(p.target_date).toLocaleDateString() : '—' },
+  ]
+
   return (
     <div className="min-h-screen bg-gray-900 text-white flex">
       <ProjectSidebar />
@@ -136,6 +174,14 @@ export default function VmsTestPlansPage() {
                   <Download size={14} /> Export Excel
                 </button>
               )}
+              {can('releases.manage') && (
+                <button
+                  onClick={() => setShowReleases(true)}
+                  className="flex items-center gap-1.5 border border-gray-700 hover:border-gray-600 text-gray-300 hover:text-white px-3 py-1.5 rounded-md text-[12px] font-semibold"
+                >
+                  <Tag size={13} /> Release Versions
+                </button>
+              )}
               {can('test_plans.create') && (
                 <button
                   onClick={() => setShowNewPlan(true)}
@@ -148,51 +194,77 @@ export default function VmsTestPlansPage() {
           }
         />
 
-        <div className="p-6">
-          <EnterpriseTable
-            rows={plans}
-            rowKey={(p) => p.id}
-            onRowClick={(p) => navigate(`/project/${projectId}/plans/${p.id}`)}
-            emptyState={
-              <EmptyState
-                icon={ClipboardList}
-                title="No test plans yet"
-                description="Create a plan to bundle test runs for a release and track your VMS test scenarios in one place."
-                action={
-                  can('test_plans.create') && (
-                    <button
-                      onClick={() => setShowNewPlan(true)}
-                      className="bg-blue-500 hover:bg-blue-400 text-white px-4 py-2 rounded-md text-[13px] font-semibold"
-                    >
-                      New Test Plan
-                    </button>
-                  )
-                }
-              />
-            }
-            columns={[
-              {
-                key: 'name',
-                label: 'Plan',
-                render: (p) => (
-                  <div>
-                    <span className="text-white font-medium">{p.name}</span>
-                    {p.description && <p className="text-[11px] text-gray-500 truncate max-w-xs">{p.description}</p>}
-                  </div>
-                ),
-              },
-              { key: 'status', label: 'Status', render: (p) => <StatusBadge domain={TEST_PLAN_STATUS} value={p.status} /> },
-              { key: 'runs', label: 'Runs', render: (p) => runCountForPlan(p.id) },
-              {
-                key: 'progress',
-                label: 'Progress',
-                width: '220px',
-                render: (p) => <StatusProgressBar domain={TEST_RUN_RESULT} counts={perPlanCounts[p.id] || countsFor([])} />,
-              },
-              { key: 'owner', label: 'Owner', render: (p) => p.owner?.name || '—' },
-              { key: 'target_date', label: 'Target Date', render: (p) => p.target_date ? new Date(p.target_date).toLocaleDateString() : '—' },
-            ]}
-          />
+        <div className="p-6 space-y-5">
+          {plans.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <label className="flex items-center gap-2 text-[12px] text-gray-400">
+                Release Version
+                <select
+                  value={releaseFilter}
+                  onChange={(e) => setReleaseFilter(e.target.value)}
+                  aria-label="Filter test plans by release version"
+                  className="bg-gray-800 border border-gray-600 rounded-md px-2 py-1.5 text-[12px] text-gray-300 outline-none focus:border-gray-500"
+                >
+                  <option value="all">All release versions ({plans.length})</option>
+                  {sortReleases(releases).map((r) => (
+                    <option key={r.id} value={r.id}>{r.name} ({plans.filter((p) => p.release_version_id === r.id).length})</option>
+                  ))}
+                  {unversioned.length > 0 && <option value="none">No release version ({unversioned.length})</option>}
+                </select>
+              </label>
+              {releaseFilter !== 'all' && (
+                <button onClick={() => setReleaseFilter('all')} className="text-[12px] text-gray-400 hover:text-white">
+                  Show all
+                </button>
+              )}
+            </div>
+          )}
+
+          {plans.length === 0 ? (
+            <EnterpriseTable
+              rows={[]}
+              rowKey={(p) => p.id}
+              columns={planColumns}
+              emptyState={
+                <EmptyState
+                  icon={ClipboardList}
+                  title="No test plans yet"
+                  description="Create a plan to bundle test runs for a release and track your VMS test scenarios in one place."
+                  action={
+                    can('test_plans.create') && (
+                      <button
+                        onClick={() => setShowNewPlan(true)}
+                        className="bg-blue-500 hover:bg-blue-400 text-white px-4 py-2 rounded-md text-[13px] font-semibold"
+                      >
+                        New Test Plan
+                      </button>
+                    )
+                  }
+                />
+              }
+            />
+          ) : planGroups.length === 0 ? (
+            <p className="text-[12px] text-gray-500 border border-gray-600 rounded-lg px-4 py-6 text-center">
+              No test plans for this release version.
+            </p>
+          ) : (
+            planGroups.map((group) => (
+              <section key={group.key}>
+                <div className="flex items-center gap-2 mb-2">
+                  <ReleaseBadge name={group.name} />
+                  <span className="text-[11px] text-gray-500">
+                    {group.plans.length} test plan{group.plans.length === 1 ? '' : 's'}
+                  </span>
+                </div>
+                <EnterpriseTable
+                  rows={group.plans}
+                  rowKey={(p) => p.id}
+                  onRowClick={(p) => navigate(`/project/${projectId}/plans/${p.id}`)}
+                  columns={planColumns}
+                />
+              </section>
+            ))
+          )}
         </div>
       </div>
 
@@ -201,11 +273,21 @@ export default function VmsTestPlansPage() {
         onClose={() => setShowNewPlan(false)}
         projectId={projectId}
         members={members}
+        releases={releases}
         userId={user?.id}
         onSaved={(newPlanId) => {
           fetchAll()
           navigate(`/project/${projectId}/plans/${newPlanId}`)
         }}
+      />
+
+      <ManageReleasesModal
+        open={showReleases}
+        onClose={() => setShowReleases(false)}
+        projectId={projectId}
+        releases={releases}
+        plans={plans}
+        onChanged={fetchAll}
       />
 
       <ExportTestPlanModal
@@ -220,7 +302,7 @@ export default function VmsTestPlansPage() {
   )
 }
 
-function TestPlanDetail({ projectId, planId, project, runs, statusRows, members, userId, onRefreshList }) {
+function TestPlanDetail({ projectId, planId, project, runs, statusRows, members, releases, userId, onRefreshList }) {
   const navigate = useNavigate()
   const { can } = usePermissions()
   // ?case=<test case id> opens the plan at that test case.
@@ -231,10 +313,11 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
   const [loading, setLoading] = useState(true)
   const [showEdit, setShowEdit] = useState(false)
   const [showAddItem, setShowAddItem] = useState(false)
+  const [showRelease, setShowRelease] = useState(false)
 
   const fetchPlan = async () => {
     const [{ data: planRow }, { data: itemRows }] = await Promise.all([
-      supabase.from('test_plans').select('*, owner:profiles!owner_id(id, name), creator:profiles!created_by(name)').eq('id', planId).single(),
+      supabase.from('test_plans').select('*, owner:profiles!owner_id(id, name), creator:profiles!created_by(name), release:release_versions(id, name)').eq('id', planId).single(),
       supabase.from('test_plan_items').select('*').eq('plan_id', planId).order('sort_order').order('created_at'),
     ])
     setPlan(planRow)
@@ -311,7 +394,12 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
         />
         <PageHeader
           title={plan.name}
-          badge={<StatusBadge domain={TEST_PLAN_STATUS} value={plan.status} />}
+          badge={
+            <div className="flex items-center gap-2">
+              <StatusBadge domain={TEST_PLAN_STATUS} value={plan.status} />
+              <ReleaseBadge name={plan.release?.name} onEdit={can('releases.manage') ? () => setShowRelease(true) : undefined} />
+            </div>
+          }
           subtitle={plan.description || `Created by ${plan.creator?.name || 'someone'}`}
           actions={
             <div className="flex items-center gap-2">
@@ -441,11 +529,21 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
         onSaved={() => { setShowEdit(false); fetchPlan(); onRefreshList() }}
       />
 
+      <ChangeReleaseModal
+        open={showRelease}
+        onClose={() => setShowRelease(false)}
+        plan={plan}
+        projectId={projectId}
+        releases={releases}
+        onSaved={() => { setShowRelease(false); fetchPlan(); onRefreshList() }}
+      />
+
       <ExportTestPlanModal
         open={showExport}
         onClose={() => setShowExport(false)}
         planId={planId}
         planName={plan.name}
+        releaseVersion={plan.release?.name}
         generatedBy={members.find((m) => m.id === userId)?.name || ''}
       />
 

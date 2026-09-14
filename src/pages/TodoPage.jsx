@@ -23,7 +23,7 @@ import { usePermissions } from '../hooks/usePermissions'
 const TASK_FIELDS =
   'id, plan_id, case_number, topic, scenario, test_steps, expected_result, result, failure_comment, ' +
   'assigned_to, assigned_at, assigned_by, task_status, task_status_at, ' +
-  'plan:test_plans(id, name), assigner:profiles!assigned_by(id, name)'
+  'plan:test_plans(id, name, release:release_versions(name)), assigner:profiles!assigned_by(id, name)'
 
 const REASON_RESULTS = ['fail', 'blocked']
 const STAYS_OPEN_RESULTS = ['fail', 'blocked', 'retest']
@@ -238,7 +238,10 @@ export default function TodoPage() {
                         <p className="text-gray-300 truncate">By {assignerName(t)}</p>
                         <p className="text-[11px] text-gray-500">To you</p>
                       </td>
-                      <td className="px-2.5 py-2 text-gray-300 truncate" title={t.plan?.name || ''}>{t.plan?.name || '—'}</td>
+                      <td className="px-2.5 py-2 text-gray-300" title={t.plan?.name || ''}>
+                        <p className="truncate">{t.plan?.name || '—'}</p>
+                        {t.plan?.release?.name && <p className="text-[11px] text-gray-500 truncate">Release {t.plan.release.name}</p>}
+                      </td>
                       <td className="px-2.5 py-2">
                         <StatusBadge domain={VMS_RESULT} value={t.result || 'not_tested'} size="sm" />
                         {REASON_RESULTS.includes(t.result) && t.failure_comment && (
@@ -325,7 +328,7 @@ export default function TodoPage() {
                   {shown.scenario || shown.topic || 'Untitled test case'}
                 </p>
                 <p className="text-[12px] text-gray-500 mt-0.5">
-                  {[shown.topic, shown.plan?.name].filter(Boolean).join(' · ')}
+                  {[shown.topic, shown.plan?.name, shown.plan?.release?.name && `Release Version ${shown.plan.release.name}`].filter(Boolean).join(' · ')}
                 </p>
               </div>
               <StatusBadge domain={TODO_TASK_STATUS} value={shown.task_status} />

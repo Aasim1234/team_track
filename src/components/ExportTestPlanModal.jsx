@@ -23,7 +23,7 @@ const COLUMNS = [
 
 const FAILURE_COLUMN = { key: 'failure_comment', label: 'Fail / Block Reason', width: 45 }
 
-export default function ExportTestPlanModal({ open, onClose, planId, planName, plans, generatedBy }) {
+export default function ExportTestPlanModal({ open, onClose, planId, planName, plans, generatedBy, releaseVersion }) {
   const toast = useToast()
   const [filename, setFilename] = useState('')
   const [format, setFormat] = useState('xlsx')
@@ -37,6 +37,14 @@ export default function ExportTestPlanModal({ open, onClose, planId, planName, p
   }, [open, planName])
 
   const targetPlanId = scope === 'current' ? planId : scope
+
+  // The report header names the plan with its release version, e.g. "VMS Test Plan · Release Version 12.70".
+  const planLabel = () => {
+    const target = plans?.find((p) => p.id === targetPlanId)
+    const name = target?.name || planName || ''
+    const release = target ? target.release?.name : releaseVersion
+    return release ? `${name} · Release Version ${release}` : name
+  }
 
   const buildRows = async () => {
     const { data } = await fetchAllRows(() =>
@@ -67,7 +75,7 @@ export default function ExportTestPlanModal({ open, onClose, planId, planName, p
       const columns = includeFailureComments ? [...COLUMNS, FAILURE_COLUMN] : COLUMNS
       if (format === 'csv') downloadCsv(name, columns, rows)
       else downloadTestPlanXlsx(name, columns, rows, {
-        planName: plans?.find((p) => p.id === targetPlanId)?.name || planName || '',
+        planName: planLabel(),
         generatedOn: new Date().toLocaleString(),
         generatedBy: generatedBy || '',
       })

@@ -4,17 +4,22 @@ import Modal from './ui/Modal'
 import FormField, { inputClass } from './ui/FormField'
 import PrimaryButton from './ui/Button'
 import { useToast } from './ui/Toast'
+import { ReleaseVersionField, resolveReleaseId } from './ReleaseVersions'
 
 // Doubles as the edit modal: pass `plan` to pre-fill and update instead of
 // insert. onSaved(newId) is called with the new id on create, with no
 // argument on edit — the caller just refetches either way.
-export default function NewTestPlanModal({ open, onClose, projectId, members, userId, plan, onSaved }) {
+export default function NewTestPlanModal({ open, onClose, projectId, members, userId, plan, onSaved, releases = [] }) {
   const toast = useToast()
   const isEdit = Boolean(plan)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [targetDate, setTargetDate] = useState('')
   const [ownerId, setOwnerId] = useState('')
+  // New plans must name their release version (chosen, or typed as a new one).
+  // An existing plan's release is changed with Edit Release Version instead.
+  const [releaseValue, setReleaseValue] = useState('')
+  const [newRelease, setNewRelease] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -23,6 +28,8 @@ export default function NewTestPlanModal({ open, onClose, projectId, members, us
       setDescription(plan?.description || '')
       setTargetDate(plan?.target_date || '')
       setOwnerId(plan?.owner_id || '')
+      setReleaseValue('')
+      setNewRelease('')
     }
   }, [open, plan])
 
@@ -42,9 +49,11 @@ export default function NewTestPlanModal({ open, onClose, projectId, members, us
       if (error) { toast.error(error.message); return }
       onSaved()
     } else {
+      const release = await resolveReleaseId(projectId, releaseValue, newRelease)
+      if (release.error) { setSaving(false); toast.error(release.error); return }
       const { data, error } = await supabase
         .from('test_plans')
-        .insert({ ...fields, project_id: projectId, created_by: userId })
+        .insert({ ...fields, project_id: projectId, created_by: userId, release_version_id: release.id })
         .select()
         .single()
       setSaving(false)
@@ -59,6 +68,15 @@ export default function NewTestPlanModal({ open, onClose, projectId, members, us
         <FormField label="Plan name" required>
           <input value={name} onChange={(e) => setName(e.target.value)} required autoFocus placeholder="e.g. VMS Regression Test Plan" className={inputClass} />
         </FormField>
+        {!isEdit && (
+          <ReleaseVersionField
+            releases={releases}
+            value={releaseValue}
+            onChange={setReleaseValue}
+            newName={newRelease}
+            onNewName={setNewRelease}
+          />
+        )}
         <FormField label="Description">
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} placeholder="What this plan covers" className={`${inputClass} resize-y`} />
         </FormField>
