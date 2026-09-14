@@ -1,10 +1,11 @@
-import { useState, useMemo, useRef, useEffect } from 'react'
-import { Plus, Search, X, MessageSquareWarning, Pencil, Check, Lock, UserPlus, UserCheck } from 'lucide-react'
+import { Fragment, useState, useMemo, useRef, useEffect } from 'react'
+import { Plus, Search, X, MessageSquareWarning, Pencil, Check, Lock, UserPlus, UserCheck, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useToast } from './ui/Toast'
 import { VMS_RESULT } from '../lib/statusConfig'
 import FailCommentModal from './FailCommentModal'
 import BulkAssignModal from './BulkAssignModal'
+import DeleteTestCaseModal from './DeleteTestCaseModal'
 import { formatCaseId } from '../lib/testCaseId'
 import { usePermissions } from '../hooks/usePermissions'
 
@@ -64,6 +65,7 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
   const { can } = usePermissions()
   const canCreate = can('test_cases.create')
   const canEdit = can('test_cases.edit')
+  const canDelete = can('test_cases.delete')
   const canAssign = can('test_cases.assign')
   const canSelfAssign = can('test_cases.self_assign') || canAssign
   const canExecuteAny = can('test_cases.execute_any')
@@ -77,6 +79,11 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
   // Bulk assignment (Assign Test Case permission): the ticked test cases.
   const [selected, setSelected] = useState(() => new Set())
   const [bulkOpen, setBulkOpen] = useState(false)
+  // Delete Test Case (from a row's edit mode): the test case awaiting confirmation.
+  const [deleteFor, setDeleteFor] = useState(null)
+  const [deleting, setDeleting] = useState(false)
+  const lastDeleteRef = useRef(null)
+  if (deleteFor) lastDeleteRef.current = deleteFor
   // Assign Section: the Topic whose test cases are being assigned (kept while the dialog closes).
   const [sectionFor, setSectionFor] = useState(null)
   const lastSectionRef = useRef(null)
@@ -300,6 +307,32 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
     if (error || !data?.length) { toast.error(error?.message || 'Could not change the assignment.'); fetchRows(); return }
     applyRow(row.id, { ...data[0], assignee: to ? { id: to, name: memberNames[to] } : null })
     toast.success(to ? `Reassigned to ${to === userId ? 'you' : memberNames[to]}` : 'Assignment removed')
+  }
+
+  // Deletion happens only after confirmation, and only if the database allows
+  // it (Delete Test Case permission); it removes the row everywhere it's shown.
+  const deleteTestCase = async () => {
+    const row = deleteFor
+    if (!row || deleting) return
+    setDeleting(true)
+    const { data, error } = await supabase.from('vms_test_plan_rows').delete().eq('id', row.id).select('id')
+    setDeleting(false)
+    if (error || !data?.length) {
+      toast.error(error?.message || "This test case couldn't be deleted. You may not have permission, or it was already removed.")
+      setDeleteFor(null)
+      fetchRows()
+      return
+    }
+    setRows((rs) => rs.filter((r) => r.id !== row.id))
+    setSelected((current) => {
+      if (!current.has(row.id)) return current
+      const next = new Set(current)
+      next.delete(row.id)
+      return next
+    })
+    if (editingId === row.id) cancelEdit()
+    setDeleteFor(null)
+    toast.success(`Test case ${formatCaseId(row.case_number)} deleted.`)
   }
 
   // A new row is blank, so it opens straight in edit mode rather than making
@@ -566,8 +599,8 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
               const canRun = canRunRow(row)
               const canEditRow = canEdit && !locked
               return (
+                <Fragment key={row.id}>
                 <tr
-                  key={row.id}
                   id={`case-${row.id}`}
                   className={`align-top border-b border-gray-800/70 ${editing ? 'bg-blue-500/[0.06]' : 'hover:bg-gray-800/30'} ${newTopic ? 'border-t border-t-gray-700' : ''} ${flashId === row.id ? 'bg-blue-500/10 shadow-[inset_3px_0_0_0_#3b82f6]' : ''} ${selected.has(row.id) ? 'bg-blue-500/[0.05]' : ''}`}
                 >
@@ -684,6 +717,26 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
                     </div>
                   </td>
                 </tr>
+                {editing && canDelete && (
+                  // Kept on its own line, away from Save, so it can't be hit by accident.
+                  <tr className="bg-blue-500/[0.06] border-b border-gray-800/70">
+                    <td colSpan={canAssign ? 7 : 6} className="px-2 py-1.5">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button
+                          onClick={() => setDeleteFor(row)}
+                          disabled={saving}
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-red-500/40 text-red-500 hover:bg-red-500/10 text-[12px] font-semibold disabled:opacity-40"
+                        >
+                          <Trash2 size={13} /> Delete Test Case
+                        </button>
+                        <span className="text-[11px] text-gray-500">
+                          Editing {formatCaseId(row.case_number)} — Ctrl+Enter saves, Esc cancels
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               )
             })}
             {!filtered.length && (
@@ -709,6 +762,17 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
         status={reasonStatusRef.current}
         onConfirm={confirmReason}
       />
+
+      {canDelete && (
+        <DeleteTestCaseModal
+          open={Boolean(deleteFor)}
+          testCase={deleteFor || lastDeleteRef.current}
+          assigneeName={(deleteFor || lastDeleteRef.current)?.assigned_to ? assigneeName(deleteFor || lastDeleteRef.current) : ''}
+          deleting={deleting}
+          onCancel={() => setDeleteFor(null)}
+          onConfirm={deleteTestCase}
+        />
+      )}
 
       {canAssign && (
         <BulkAssignModal
