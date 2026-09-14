@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient'
 import { useToast } from './ui/Toast'
 import { VMS_RESULT } from '../lib/statusConfig'
 import FailCommentModal from './FailCommentModal'
+import BulkAssignModal from './BulkAssignModal'
 import { formatCaseId } from '../lib/testCaseId'
 import { usePermissions } from '../hooks/usePermissions'
 
@@ -73,6 +74,9 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
   const [resultFilter, setResultFilter] = useState('all')
   const [assignFilter, setAssignFilter] = useState('all')
   const [reasonFor, setReasonFor] = useState(null)   // { row, status, existing } | null
+  // Bulk assignment (Assign Test Case permission): the ticked test cases.
+  const [selected, setSelected] = useState(() => new Set())
+  const [bulkOpen, setBulkOpen] = useState(false)
   // Kept after close so the dialog doesn't switch colours while it animates out.
   const reasonStatusRef = useRef('fail')
   if (reasonFor) reasonStatusRef.current = reasonFor.status
@@ -92,6 +96,12 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
       .order('sort_order')
     if (error) toast.error(error.message)
     setRows(data || [])
+    // Forget ticks for test cases that are no longer in this plan.
+    const present = new Set((data || []).map((r) => r.id))
+    setSelected((current) => {
+      const next = new Set([...current].filter((id) => present.has(id)))
+      return next.size === current.size ? current : next
+    })
     setLoading(false)
   }
 
@@ -329,6 +339,24 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
     return c
   }, [rows, userId])
 
+  const toggleSelected = (id) => setSelected((current) => {
+    const next = new Set(current)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    return next
+  })
+  // The header checkbox ticks or clears the test cases currently shown (after search and filters).
+  const shownIds = filtered.map((r) => r.id)
+  const allShownSelected = shownIds.length > 0 && shownIds.every((id) => selected.has(id))
+  const toggleAllShown = () => setSelected((current) => {
+    const next = new Set(current)
+    for (const id of shownIds) {
+      if (allShownSelected) next.delete(id)
+      else next.add(id)
+    }
+    return next
+  })
+
   const readClass = 'px-1.5 py-0.5 text-[12px] leading-[1.4] whitespace-pre-wrap break-words'
   const editClass =
     'w-full bg-gray-900 border border-gray-600 focus:border-blue-500 text-[12px] text-gray-100 leading-[1.4] resize-none outline-none rounded px-1.5 py-0.5 whitespace-pre-wrap block'
@@ -478,10 +506,39 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
         )}
       </div>
 
+      {canAssign && selected.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 px-3 py-2 rounded-md border border-blue-500/30 bg-blue-500/10 text-[12px]">
+          <span className="font-semibold text-blue-400">
+            {selected.size} test case{selected.size === 1 ? '' : 's'} selected
+          </span>
+          <button
+            onClick={() => setBulkOpen(true)}
+            className="flex items-center gap-1.5 bg-blue-500 hover:bg-blue-400 text-white px-2.5 py-1 rounded-md text-[12px] font-semibold"
+          >
+            <UserPlus size={13} /> Assign Selected
+          </button>
+          <button onClick={() => setSelected(new Set())} className="ml-auto text-gray-400 hover:text-white">
+            Clear selection
+          </button>
+        </div>
+      )}
+
       <div className="border border-gray-800 rounded-lg overflow-x-auto">
         <table className="w-full border-collapse table-fixed min-w-[960px]">
           <thead>
             <tr className="bg-gray-800/80 text-left">
+              {canAssign && (
+                <th className="w-8 px-2 py-1.5 border-b border-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={allShownSelected}
+                    onChange={toggleAllShown}
+                    title="Select all test cases shown"
+                    aria-label="Select all test cases shown"
+                    className="accent-blue-500 align-middle"
+                  />
+                </th>
+              )}
               {[['Topic', 'w-[13%]'], ['Scenario', 'w-[18%]'], ['Test Steps', 'w-[31%]'], ['Expected Result', 'w-[26%]'], ['RESULT', 'w-[12%]']].map(([label, w]) => (
                 <th key={label} className={`${w} px-2 py-1.5 text-[11px] font-semibold text-gray-300 uppercase tracking-wide border-b border-gray-700`}>
                   {label}
@@ -503,8 +560,19 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
                 <tr
                   key={row.id}
                   id={`case-${row.id}`}
-                  className={`align-top border-b border-gray-800/70 ${editing ? 'bg-blue-500/[0.06]' : 'hover:bg-gray-800/30'} ${newTopic ? 'border-t border-t-gray-700' : ''} ${flashId === row.id ? 'bg-blue-500/10 shadow-[inset_3px_0_0_0_#3b82f6]' : ''}`}
+                  className={`align-top border-b border-gray-800/70 ${editing ? 'bg-blue-500/[0.06]' : 'hover:bg-gray-800/30'} ${newTopic ? 'border-t border-t-gray-700' : ''} ${flashId === row.id ? 'bg-blue-500/10 shadow-[inset_3px_0_0_0_#3b82f6]' : ''} ${selected.has(row.id) ? 'bg-blue-500/[0.05]' : ''}`}
                 >
+                  {canAssign && (
+                    <td className="px-2 py-1">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(row.id)}
+                        onChange={() => toggleSelected(row.id)}
+                        aria-label={`Select ${formatCaseId(row.case_number)}`}
+                        className="accent-blue-500 align-middle"
+                      />
+                    </td>
+                  )}
                   <td className={`px-1 py-0.5 ${editing ? 'shadow-[inset_2px_0_0_0_#3b82f6]' : ''}`}>
                     {editing
                       ? editCell('topic', 'font-semibold', true)
@@ -598,7 +666,7 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
             })}
             {!filtered.length && (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-[12px] text-gray-500">
+                <td colSpan={canAssign ? 7 : 6} className="px-3 py-8 text-center text-[12px] text-gray-500">
                   {rows.length ? 'No rows match your filters.' : 'No rows yet — import from your sheet or add one.'}
                 </td>
               </tr>
@@ -619,6 +687,17 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
         status={reasonStatusRef.current}
         onConfirm={confirmReason}
       />
+
+      {canAssign && (
+        <BulkAssignModal
+          open={bulkOpen}
+          onClose={() => setBulkOpen(false)}
+          rows={rows.filter((r) => selected.has(r.id))}
+          members={members}
+          userId={userId}
+          onAssigned={() => { setBulkOpen(false); setSelected(new Set()); fetchRows() }}
+        />
+      )}
     </div>
   )
 }

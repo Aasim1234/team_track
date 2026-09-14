@@ -12,6 +12,7 @@ export const AUDIT_ACTIONS = {
   assigned: { label: 'Assigned test case' },
   unassigned: { label: 'Unassigned test case' },
   reassigned: { label: 'Reassigned test case' },
+  bulk_assigned: { label: 'Bulk assigned test cases' },
   task_completed: { label: 'Completed task' },
   task_closed: { label: 'Closed task' },
   task_reopened: { label: 'Reopened task' },
