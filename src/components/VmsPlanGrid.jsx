@@ -368,7 +368,7 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
 
   const readClass = 'px-1.5 py-0.5 text-[12px] leading-[1.4] whitespace-pre-wrap break-words'
   const editClass =
-    'w-full bg-gray-900 border border-gray-600 focus:border-blue-500 text-[12px] text-gray-100 leading-[1.4] resize-none outline-none rounded px-1.5 py-0.5 whitespace-pre-wrap block'
+    'w-full bg-gray-900 border border-gray-600 focus:border-blue-500 text-[12px] text-white leading-[1.4] resize-none outline-none rounded px-1.5 py-0.5 whitespace-pre-wrap block'
 
   const readCell = (value, extra = '') => (
     <div className={`${readClass} ${extra}`}>{value || <span className="text-gray-600">—</span>}</div>
@@ -407,7 +407,7 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
             >
               <option value="" className="bg-gray-800">Assign to…</option>
               {members.filter((m) => m.id !== userId).map((m) => (
-                <option key={m.id} value={m.id} className="bg-gray-800 text-gray-200">{m.name || 'Unnamed user'}</option>
+                <option key={m.id} value={m.id} className="bg-gray-800 text-gray-300">{m.name || 'Unnamed user'}</option>
               ))}
             </select>
           )}
@@ -445,9 +445,9 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
             className="mt-0.5 w-full text-[10px] bg-transparent border border-gray-700 hover:border-gray-600 rounded px-1 py-0.5 text-gray-500 outline-none"
           >
             <option value="" className="bg-gray-800">Override…</option>
-            <option value="__unassign" className="bg-gray-800 text-gray-200">Unassign</option>
+            <option value="__unassign" className="bg-gray-800 text-gray-300">Unassign</option>
             {members.filter((m) => m.id !== row.assigned_to).map((m) => (
-              <option key={m.id} value={m.id} className="bg-gray-800 text-gray-200">
+              <option key={m.id} value={m.id} className="bg-gray-800 text-gray-300">
                 Reassign to {m.id === userId ? 'me' : m.name || 'Unnamed user'}
               </option>
             ))}
@@ -468,7 +468,7 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search ID, topic, scenario, steps…"
-            className="bg-gray-800 border border-gray-700 rounded-md pl-7 pr-7 py-1.5 text-[12px] text-gray-200 w-72 outline-none focus:border-gray-600"
+            className="bg-gray-800 border border-gray-700 rounded-md pl-7 pr-7 py-1.5 text-[12px] text-gray-300 w-72 outline-none focus:border-gray-600"
           />
           {search && (
             <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
@@ -483,7 +483,7 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
               key={key}
               onClick={() => setResultFilter(key)}
               className={`px-2 py-1 rounded-md text-[11px] font-medium border ${
-                resultFilter === key ? 'bg-blue-500/10 border-blue-500/40 text-blue-400' : 'border-gray-700 text-gray-400 hover:text-gray-200'
+                resultFilter === key ? 'bg-blue-500/10 border-blue-500/40 text-blue-400' : 'border-gray-700 text-gray-400 hover:text-gray-300'
               }`}
             >
               {label}
@@ -627,7 +627,7 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
                       className={`w-full text-[11px] font-semibold rounded-md border px-1.5 py-0.5 outline-none disabled:cursor-not-allowed ${RESULT_CLASS[row.result] || RESULT_CLASS.not_tested}`}
                     >
                       {Object.entries(VMS_RESULT).map(([key, cfg]) => (
-                        <option key={key} value={key} className="bg-gray-800 text-gray-200">{cfg.label}</option>
+                        <option key={key} value={key} className="bg-gray-800 text-gray-300">{cfg.label}</option>
                       ))}
                     </select>
                     {REASON_RESULTS.includes(row.result) && (
@@ -635,7 +635,7 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
                         <button
                           onClick={() => setReasonFor({ row, status: row.result, existing: row.failure_comment || '' })}
                           title={row.failure_comment || ''}
-                          className="mt-0.5 flex items-start gap-1 text-left text-[10px] text-gray-400 hover:text-gray-200 w-full"
+                          className="mt-0.5 flex items-start gap-1 text-left text-[10px] text-gray-400 hover:text-gray-300 w-full"
                         >
                           <MessageSquareWarning size={11} className={`mt-px flex-shrink-0 ${REASON_ICON_CLASS[row.result]}`} />
                           <span className="line-clamp-2">{row.failure_comment || 'Add reason'}</span>
@@ -665,7 +665,7 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
                             onClick={cancelEdit}
                             disabled={saving}
                             title="Cancel (Esc)"
-                            className="p-1 rounded text-gray-400 hover:text-gray-200 hover:bg-gray-700 disabled:opacity-40"
+                            className="p-1 rounded text-gray-400 hover:text-gray-300 hover:bg-gray-700 disabled:opacity-40"
                           >
                             <X size={14} />
                           </button>

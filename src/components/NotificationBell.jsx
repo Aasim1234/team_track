@@ -78,7 +78,7 @@ export default function NotificationBell() {
                   <div className="flex gap-2 items-start">
                     <Icon size={14} className="text-gray-400 mt-0.5 flex-shrink-0" />
                     <div className="flex-1">
-                      <p className="text-sm text-gray-200">{n.message}</p>
+                      <p className="text-sm text-gray-300">{n.message}</p>
                       <p className="text-xs text-gray-500 mt-1">{timeAgo(n.created_at)}</p>
                     </div>
                     {!n.read && <span className="w-2 h-2 rounded-full bg-green-500 mt-1"></span>}

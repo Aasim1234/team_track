@@ -136,7 +136,7 @@ export default function ProjectSidebar() {
             <button
               onClick={() => navigate('/dashboard')}
               title="Back to all projects"
-              className="flex items-center gap-1.5 -ml-1.5 px-1.5 py-1 rounded-md text-gray-200 hover:text-white hover:bg-gray-650 text-[12px] font-semibold"
+              className="flex items-center gap-1.5 -ml-1.5 px-1.5 py-1 rounded-md text-gray-300 hover:text-white hover:bg-gray-650 text-[12px] font-semibold"
             >
               <ArrowLeft size={14} strokeWidth={2.25} />
               {!collapsed && 'All Projects'}

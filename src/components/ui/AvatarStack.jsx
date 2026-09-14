@@ -31,7 +31,7 @@ export default function AvatarStack({ names = [], max = 4, size = 22, ringColor 
       ))}
       {overflow > 0 && (
         <span
-          className={`rounded-full ${ringColor} ring-2 bg-gray-600 flex items-center justify-center text-gray-200 font-bold flex-shrink-0`}
+          className={`rounded-full ${ringColor} ring-2 bg-gray-600 flex items-center justify-center text-gray-300 font-bold flex-shrink-0`}
           style={{ width: size, height: size, fontSize: Math.round(size * 0.35), marginLeft: -Math.round(size * 0.3) }}
         >
           +{overflow}

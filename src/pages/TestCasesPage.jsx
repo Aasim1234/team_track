@@ -602,7 +602,7 @@ function TestCaseDetail({ projectId, caseId, project, sectionsWithPath, members,
                               <span className="font-medium">{h.profiles?.name || 'Someone'}</span> changed{' '}
                               <span className="text-gray-400">{humanize(h.field_name)}</span> from{' '}
                               <span className="text-gray-400">{h.old_value || '—'}</span> to{' '}
-                              <span className="text-gray-200">{h.new_value || '—'}</span>
+                              <span className="text-gray-300">{h.new_value || '—'}</span>
                             </>
                           )}
                         </span>

@@ -295,7 +295,7 @@ export default function Dashboard() {
                     {CASE_SERIES.filter((s) => caseSummary.counts[s.key] > 0).map((s) => (
                       <div key={s.key} className="flex items-center gap-2.5 text-[13px]">
                         <Swatch series={s} round />
-                        <span className="text-gray-200 flex-1 truncate">{s.label}</span>
+                        <span className="text-gray-300 flex-1 truncate">{s.label}</span>
                         <span className="text-white font-semibold tabular-nums">{fmt(caseSummary.counts[s.key])}</span>
                         <span className="text-gray-500 tabular-nums w-12 text-right">{pctLabel(caseSummary.counts[s.key], caseSummary.total)}</span>
                       </div>

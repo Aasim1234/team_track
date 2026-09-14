@@ -115,7 +115,7 @@ export default function ExportTestPlanModal({ open, onClose, planId, planName, p
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium border ${
                   format === value
                     ? 'bg-blue-500/10 border-blue-500/40 text-blue-400'
-                    : 'border-gray-700 text-gray-400 hover:text-gray-200'
+                    : 'border-gray-700 text-gray-400 hover:text-gray-300'
                 }`}
               >
                 <Icon size={13} /> {label}
@@ -132,7 +132,7 @@ export default function ExportTestPlanModal({ open, onClose, planId, planName, p
             className="mt-0.5 accent-blue-500"
           />
           <span>
-            <span className="block text-[12px] text-gray-200 font-medium">Include Fail / Block Reasons</span>
+            <span className="block text-[12px] text-gray-300 font-medium">Include Fail / Block Reasons</span>
             <span className="block text-[11px] text-gray-500">
               Adds a sixth column with the reason for each failed or blocked row. Off by default, so the standard export keeps its five columns.
             </span>

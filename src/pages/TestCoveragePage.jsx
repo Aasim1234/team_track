@@ -167,7 +167,7 @@ export default function TestCoveragePage() {
               <select
                 value={projectId}
                 onChange={(e) => setProjectId(e.target.value)}
-                className="bg-gray-800 border border-gray-600 rounded-md px-2.5 py-1.5 text-[12px] text-gray-200 outline-none"
+                className="bg-gray-800 border border-gray-600 rounded-md px-2.5 py-1.5 text-[12px] text-gray-300 outline-none"
               >
                 <option value="all">All projects</option>
                 {data.projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}

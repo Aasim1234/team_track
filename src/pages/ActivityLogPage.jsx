@@ -38,7 +38,7 @@ function Value({ entry, value }) {
 }
 
 const selectClass =
-  'bg-gray-800 border border-gray-600 rounded-md px-2 py-1.5 text-[12px] text-gray-200 outline-none focus:border-gray-500'
+  'bg-gray-800 border border-gray-600 rounded-md px-2 py-1.5 text-[12px] text-gray-300 outline-none focus:border-gray-500'
 
 // Day boundaries in the viewer's own timezone.
 const startOfDay = (ymd) => new Date(`${ymd}T00:00:00`)
@@ -165,7 +165,7 @@ export default function ActivityLogPage() {
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Test case or item…"
-                className="bg-gray-800 border border-gray-600 rounded-md pl-7 pr-2 py-1.5 text-[12px] text-gray-200 w-52 outline-none focus:border-gray-500"
+                className="bg-gray-800 border border-gray-600 rounded-md pl-7 pr-2 py-1.5 text-[12px] text-gray-300 w-52 outline-none focus:border-gray-500"
               />
             </div>
             <label className="flex items-center gap-1.5 text-[12px] text-gray-400">
@@ -207,11 +207,11 @@ export default function ActivityLogPage() {
                       <tr key={e.id} className="align-top border-b border-gray-800/70 text-[12px]">
                         <td className="px-2.5 py-2 text-gray-400 whitespace-nowrap tabular-nums">{formatAuditTime(e.occurred_at)}</td>
                         <td className="px-2.5 py-2 text-white font-medium truncate" title={e.actor_name}>{e.actor_name}</td>
-                        <td className="px-2.5 py-2 text-gray-200">
+                        <td className="px-2.5 py-2 text-gray-300">
                           {AUDIT_ACTIONS[e.action]?.label || e.action}
                           {e.field && e.action !== 'result_changed' && <span className="block text-[11px] text-gray-500">{e.field}</span>}
                         </td>
-                        <td className="px-2.5 py-2 text-gray-200 break-words" title={e.entity_label || ''}>
+                        <td className="px-2.5 py-2 text-gray-300 break-words" title={e.entity_label || ''}>
                           <span className="line-clamp-2">{e.entity_label || '—'}</span>
                         </td>
                         <td className="px-2.5 py-2 text-gray-400 truncate" title={e.plan_name || ''}>{e.plan_name || '—'}</td>
