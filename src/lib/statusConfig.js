@@ -97,6 +97,18 @@ export const TEST_PLAN_STATUS = {
   completed: { label: 'Completed', color: 'green' },
 }
 
+// A release version's lifecycle (release_versions.status) and its decision.
+export const RELEASE_STATUS = {
+  active: { label: 'Active', color: 'blue' },
+  testing: { label: 'Testing', color: 'orange' },
+  completed: { label: 'Completed', color: 'green' },
+}
+
+export const RELEASE_DECISION = {
+  pass: { label: 'Pass', color: 'green' },
+  discard: { label: 'Discard', color: 'red' },
+}
+
 export const TEST_PLAN_ITEM_STATUS = {
   not_started: { label: 'Not Started', color: 'gray' },
   in_progress: { label: 'In Progress', color: 'blue' },

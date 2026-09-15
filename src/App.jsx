@@ -6,6 +6,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import ProjectOverviewPage from './pages/ProjectOverviewPage'
 import VmsTestPlansPage from './pages/VmsTestPlansPage'
+import ReleasesPage from './pages/ReleasesPage'
 import ActivityLogPage from './pages/ActivityLogPage'
 import TestCoveragePage from './pages/TestCoveragePage'
 import TodoPage from './pages/TodoPage'
@@ -182,6 +183,22 @@ function AnimatedRoutes() {
           element={
             <ProtectedRoute need={['test_plans.view']} title="VMS Test Plans">
               <VmsTestPlansPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/project/:id/releases"
+          element={
+            <ProtectedRoute need={['test_plans.view']} title="Releases">
+              <ReleasesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/project/:id/releases/:releaseId"
+          element={
+            <ProtectedRoute need={['test_plans.view']} title="Releases">
+              <ReleasesPage />
             </ProtectedRoute>
           }
         />

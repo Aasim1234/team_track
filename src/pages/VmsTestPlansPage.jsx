@@ -62,14 +62,14 @@ export default function VmsTestPlansPage() {
         supabase.from('projects').select('*').eq('id', projectId).single(),
         supabase
           .from('test_plans')
-          .select('*, owner:profiles!owner_id(id, name), creator:profiles!created_by(name), release:release_versions(id, name)')
+          .select('*, owner:profiles!owner_id(id, name), creator:profiles!created_by(name), release:release_versions(id, name, status)')
           .eq('project_id', projectId)
           .order('created_at', { ascending: false }),
         supabase.from('test_runs').select('id, name, status, test_plan_id').eq('project_id', projectId),
         fetchAllRows(() =>
           supabase.from('test_run_case_current_status').select('run_id, current_status, run_case_id').eq('project_id', projectId).order('run_case_id')),
         supabase.from('project_members').select('user_id, profiles(id, name)').eq('project_id', projectId),
-        supabase.from('release_versions').select('id, name, created_at').eq('project_id', projectId),
+        supabase.from('release_versions').select('id, name, created_at, status').eq('project_id', projectId),
       ])
     setProject(proj)
     setPlans(planRows || [])
@@ -251,10 +251,18 @@ export default function VmsTestPlansPage() {
             planGroups.map((group) => (
               <section key={group.key}>
                 <div className="flex items-center gap-2 mb-2">
-                  <ReleaseBadge name={group.name} />
+                  <ReleaseBadge name={group.name} status={releases.find((r) => r.id === group.key)?.status} />
                   <span className="text-[11px] text-gray-500">
                     {group.plans.length} test plan{group.plans.length === 1 ? '' : 's'}
                   </span>
+                  {group.name && (
+                    <button
+                      onClick={() => navigate(`/project/${projectId}/releases/${group.key}`)}
+                      className="ml-auto text-[12px] text-blue-500 hover:underline"
+                    >
+                      Release report →
+                    </button>
+                  )}
                 </div>
                 <EnterpriseTable
                   rows={group.plans}
@@ -317,7 +325,7 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
 
   const fetchPlan = async () => {
     const [{ data: planRow }, { data: itemRows }] = await Promise.all([
-      supabase.from('test_plans').select('*, owner:profiles!owner_id(id, name), creator:profiles!created_by(name), release:release_versions(id, name)').eq('id', planId).single(),
+      supabase.from('test_plans').select('*, owner:profiles!owner_id(id, name), creator:profiles!created_by(name), release:release_versions(id, name, status)').eq('id', planId).single(),
       supabase.from('test_plan_items').select('*').eq('plan_id', planId).order('sort_order').order('created_at'),
     ])
     setPlan(planRow)
@@ -397,7 +405,7 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
           badge={
             <div className="flex items-center gap-2">
               <StatusBadge domain={TEST_PLAN_STATUS} value={plan.status} />
-              <ReleaseBadge name={plan.release?.name} onEdit={can('releases.manage') ? () => setShowRelease(true) : undefined} />
+              <ReleaseBadge name={plan.release?.name} status={plan.release?.status} onEdit={can('releases.manage') ? () => setShowRelease(true) : undefined} />
             </div>
           }
           subtitle={plan.description || `Created by ${plan.creator?.name || 'someone'}`}
@@ -443,12 +451,29 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
         />
 
         <div className="p-6 space-y-4">
-          <button
-            onClick={() => navigate(`/project/${projectId}/plans`)}
-            className="flex items-center gap-1.5 text-[13px] text-gray-500 hover:text-white"
-          >
-            <ArrowLeft size={14} /> All Test Plans
-          </button>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <button
+              onClick={() => navigate(`/project/${projectId}/plans`)}
+              className="flex items-center gap-1.5 text-[13px] text-gray-500 hover:text-white"
+            >
+              <ArrowLeft size={14} /> All Test Plans
+            </button>
+            {plan.release && (
+              <button
+                onClick={() => navigate(`/project/${projectId}/releases/${plan.release.id}`)}
+                className="text-[12px] text-blue-500 hover:underline"
+              >
+                Release {plan.release.name} report →
+              </button>
+            )}
+          </div>
+
+          {plan.release?.status === 'completed' && (
+            <p className="rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-[12px] text-gray-300">
+              Release {plan.release.name} is completed and its report is saved. Changes made here don't change that report.
+              To test the next version, change this plan's release version to an open release.
+            </p>
+          )}
 
           <BentoCard className="p-4">
             <div className="flex items-center justify-between mb-1">
