@@ -91,20 +91,11 @@ export const GOAL_STATUS = {
   done: { label: 'Done', color: 'blue' },
 }
 
+// A test plan's status for its release version. Pass and Discard save the
+// plan's release report to Reports.
 export const TEST_PLAN_STATUS = {
-  draft: { label: 'Draft', color: 'gray' },
   active: { label: 'Active', color: 'blue' },
-  completed: { label: 'Completed', color: 'green' },
-}
-
-// A release version's lifecycle (release_versions.status) and its decision.
-export const RELEASE_STATUS = {
-  active: { label: 'Active', color: 'blue' },
-  testing: { label: 'Testing', color: 'orange' },
-  completed: { label: 'Completed', color: 'green' },
-}
-
-export const RELEASE_DECISION = {
+  under_testing: { label: 'Under Testing', color: 'orange' },
   pass: { label: 'Pass', color: 'green' },
   discard: { label: 'Discard', color: 'red' },
 }

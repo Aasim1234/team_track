@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { BarChart3 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { fetchAllRows } from '../lib/fetchAllRows'
@@ -9,6 +9,7 @@ import PageHeader from '../components/PageHeader'
 import StatusProgressBar from '../components/ui/StatusProgressBar'
 import EmptyState from '../components/ui/EmptyState'
 import FormField, { inputClass } from '../components/ui/FormField'
+import ReleaseReports from '../components/ReleaseReports'
 import { TEST_RUN_RESULT, TEST_CASE_PRIORITY, TEST_CASE_TYPE } from '../lib/statusConfig'
 import { summarizeRunCases, formatPercent } from '../lib/testMetrics'
 
@@ -28,7 +29,9 @@ export default function ReportsPage() {
   const [cases, setCases] = useState([])
   const [executedCaseIds, setExecutedCaseIds] = useState(new Set())
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('summary')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tab = searchParams.get('tab') || 'summary'
+  const setTab = (id) => setSearchParams(id === 'summary' ? {} : { tab: id })
   const [selectedRunId, setSelectedRunId] = useState('')
   const [runRows, setRunRows] = useState([])
   const [loadingRun, setLoadingRun] = useState(false)
@@ -96,7 +99,7 @@ export default function ReportsPage() {
 
         <div className="p-6">
           <div className="flex gap-1 mb-5 border-b border-gray-600">
-            {[{ id: 'summary', label: 'Run Summary' }, { id: 'coverage', label: 'Test Coverage' }].map((t) => (
+            {[{ id: 'summary', label: 'Run Summary' }, { id: 'coverage', label: 'Test Coverage' }, { id: 'releases', label: 'Release Reports' }].map((t) => (
               <button
                 key={t.id}
                 onClick={() => setTab(t.id)}
@@ -134,6 +137,8 @@ export default function ReportsPage() {
               </div>
             )
           )}
+
+          {tab === 'releases' && <ReleaseReports projectId={projectId} />}
 
           {tab === 'coverage' && (
             cases.length === 0 ? (

@@ -3,7 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, Clock, Star, Boxes, Plus,
   PanelLeftClose, PanelLeftOpen, ChevronDown,
-  ArrowLeft, Home, BarChart3, CheckSquare, ClipboardList, History, Tag,
+  ArrowLeft, Home, BarChart3, CheckSquare, ClipboardList, History,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../hooks/useAuth'
@@ -26,7 +26,6 @@ function projectNavItems(projectId) {
     { to: `${base}/overview`, label: 'Project Overview', icon: Home, need: 'projects.view' },
     { to: `${base}/todo`, label: 'To-Do', icon: CheckSquare, need: 'test_cases.view' },
     { to: `${base}/plans`, label: 'VMS Test Plans', icon: ClipboardList, need: 'test_plans.view' },
-    { to: `${base}/releases`, label: 'Releases', icon: Tag, need: 'test_plans.view' },
     { to: `${base}/reports`, label: 'Reports', icon: BarChart3, need: 'reports.view' },
     { to: `${base}/activity`, label: 'Activity Log', icon: History, need: 'admin.audit_logs' },
   ]

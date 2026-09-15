@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, ArrowLeft, ClipboardList, Link2, Unlink, Trash2, Pencil, Download, Tag } from 'lucide-react'
+import { Plus, ArrowLeft, ClipboardList, Link2, Unlink, Trash2, Pencil, Download, Tag, FileSpreadsheet } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { fetchAllRows } from '../lib/fetchAllRows'
 import { summarizeRunCases, formatPercent } from '../lib/testMetrics'
@@ -12,6 +12,7 @@ import PageHeader from '../components/PageHeader'
 import NewTestPlanModal from '../components/NewTestPlanModal'
 import { ReleaseBadge, ChangeReleaseModal, ManageReleasesModal, sortReleases } from '../components/ReleaseVersions'
 import ExportTestPlanModal from '../components/ExportTestPlanModal'
+import TestPlanStatusModal, { FINAL_STATUSES, statusChangeNeedsConfirm } from '../components/TestPlanStatusModal'
 import VmsPlanGrid from '../components/VmsPlanGrid'
 import EnterpriseTable from '../components/ui/EnterpriseTable'
 import StatusBadge from '../components/ui/StatusBadge'
@@ -62,14 +63,14 @@ export default function VmsTestPlansPage() {
         supabase.from('projects').select('*').eq('id', projectId).single(),
         supabase
           .from('test_plans')
-          .select('*, owner:profiles!owner_id(id, name), creator:profiles!created_by(name), release:release_versions(id, name, status)')
+          .select('*, owner:profiles!owner_id(id, name), creator:profiles!created_by(name), release:release_versions(id, name)')
           .eq('project_id', projectId)
           .order('created_at', { ascending: false }),
         supabase.from('test_runs').select('id, name, status, test_plan_id').eq('project_id', projectId),
         fetchAllRows(() =>
           supabase.from('test_run_case_current_status').select('run_id, current_status, run_case_id').eq('project_id', projectId).order('run_case_id')),
         supabase.from('project_members').select('user_id, profiles(id, name)').eq('project_id', projectId),
-        supabase.from('release_versions').select('id, name, created_at, status').eq('project_id', projectId),
+        supabase.from('release_versions').select('id, name, created_at').eq('project_id', projectId),
       ])
     setProject(proj)
     setPlans(planRows || [])
@@ -127,11 +128,18 @@ export default function VmsTestPlansPage() {
 
   // Test plans grouped under their release version, newest release first; plans
   // not yet linked to a release come last.
+  // Pass / Discard plans have finished their release, so they're listed
+  // separately with a link to their release report.
   const unversioned = plans.filter((p) => !p.release_version_id)
+  const inFilter = (p) => releaseFilter === 'all' || (releaseFilter === 'none' ? !p.release_version_id : p.release_version_id === releaseFilter)
+  const openPlans = plans.filter((p) => !FINAL_STATUSES.includes(p.status))
+  const finishedPlans = plans.filter((p) => FINAL_STATUSES.includes(p.status) && inFilter(p))
   const planGroups = [
-    ...sortReleases(releases).map((r) => ({ key: r.id, name: r.name, plans: plans.filter((p) => p.release_version_id === r.id) })),
-    { key: 'none', name: null, plans: unversioned },
+    ...sortReleases(releases).map((r) => ({ key: r.id, name: r.name, plans: openPlans.filter((p) => p.release_version_id === r.id) })),
+    { key: 'none', name: null, plans: openPlans.filter((p) => !p.release_version_id) },
   ].filter((g) => g.plans.length > 0 && (releaseFilter === 'all' || releaseFilter === g.key))
+
+  const reportLink = (p) => `/project/${projectId}/reports?tab=releases&plan=${p.id}&release=${p.release_version_id}`
 
   const planColumns = [
     {
@@ -243,7 +251,7 @@ export default function VmsTestPlansPage() {
                 />
               }
             />
-          ) : planGroups.length === 0 ? (
+          ) : planGroups.length === 0 && finishedPlans.length === 0 ? (
             <p className="text-[12px] text-gray-500 border border-gray-600 rounded-lg px-4 py-6 text-center">
               No test plans for this release version.
             </p>
@@ -251,18 +259,10 @@ export default function VmsTestPlansPage() {
             planGroups.map((group) => (
               <section key={group.key}>
                 <div className="flex items-center gap-2 mb-2">
-                  <ReleaseBadge name={group.name} status={releases.find((r) => r.id === group.key)?.status} />
+                  <ReleaseBadge name={group.name} />
                   <span className="text-[11px] text-gray-500">
                     {group.plans.length} test plan{group.plans.length === 1 ? '' : 's'}
                   </span>
-                  {group.name && (
-                    <button
-                      onClick={() => navigate(`/project/${projectId}/releases/${group.key}`)}
-                      className="ml-auto text-[12px] text-blue-500 hover:underline"
-                    >
-                      Release report →
-                    </button>
-                  )}
                 </div>
                 <EnterpriseTable
                   rows={group.plans}
@@ -272,6 +272,52 @@ export default function VmsTestPlansPage() {
                 />
               </section>
             ))
+          )}
+
+          {finishedPlans.length > 0 && (
+            <section>
+              <div className="flex items-center gap-2 mb-2">
+                <h2 className="text-[13px] font-semibold text-white">Pass / Discard</h2>
+                <span className="text-[11px] text-gray-500">
+                  {finishedPlans.length} test plan{finishedPlans.length === 1 ? '' : 's'} · release reports are in Reports → Release Reports
+                </span>
+              </div>
+              <EnterpriseTable
+                rows={finishedPlans}
+                rowKey={(p) => p.id}
+                onRowClick={(p) => navigate(`/project/${projectId}/plans/${p.id}`)}
+                columns={[
+                  planColumns[0],
+                  { key: 'release', label: 'Release Version', width: '130px', render: (p) => p.release?.name || '—' },
+                  {
+                    key: 'status',
+                    label: 'Status',
+                    render: (p) => (
+                      <div className="min-w-0">
+                        <StatusBadge domain={TEST_PLAN_STATUS} value={p.status} />
+                        {p.status === 'discard' && (
+                          <p className="text-[11px] text-red-500 truncate max-w-[260px] mt-0.5" title={p.discard_reason}>{p.discard_reason}</p>
+                        )}
+                      </div>
+                    ),
+                  },
+                  { key: 'changed', label: 'Marked On', width: '130px', render: (p) => (p.status_changed_at ? new Date(p.status_changed_at).toLocaleDateString() : '—') },
+                  {
+                    key: 'report',
+                    label: 'Release Report',
+                    width: '130px',
+                    render: (p) => (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigate(reportLink(p)) }}
+                        className="flex items-center gap-1 text-[12px] font-semibold text-blue-500 hover:underline"
+                      >
+                        <FileSpreadsheet size={12} /> View report
+                      </button>
+                    ),
+                  },
+                ]}
+              />
+            </section>
           )}
         </div>
       </div>
@@ -313,6 +359,7 @@ export default function VmsTestPlansPage() {
 function TestPlanDetail({ projectId, planId, project, runs, statusRows, members, releases, userId, onRefreshList }) {
   const navigate = useNavigate()
   const { can } = usePermissions()
+  const toast = useToast()
   // ?case=<test case id> opens the plan at that test case.
   const [searchParams] = useSearchParams()
   const [showExport, setShowExport] = useState(false)
@@ -322,10 +369,11 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
   const [showEdit, setShowEdit] = useState(false)
   const [showAddItem, setShowAddItem] = useState(false)
   const [showRelease, setShowRelease] = useState(false)
+  const [statusChange, setStatusChange] = useState(null)   // status awaiting confirmation (Pass / Discard / reopen)
 
   const fetchPlan = async () => {
     const [{ data: planRow }, { data: itemRows }] = await Promise.all([
-      supabase.from('test_plans').select('*, owner:profiles!owner_id(id, name), creator:profiles!created_by(name), release:release_versions(id, name, status)').eq('id', planId).single(),
+      supabase.from('test_plans').select('*, owner:profiles!owner_id(id, name), creator:profiles!created_by(name), release:release_versions(id, name)').eq('id', planId).single(),
       supabase.from('test_plan_items').select('*').eq('plan_id', planId).order('sort_order').order('created_at'),
     ])
     setPlan(planRow)
@@ -361,8 +409,14 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
     onRefreshList()
   }
 
+  // Active <-> Under Testing saves straight away; Pass, Discard and moving back
+  // from them go through TestPlanStatusModal (they add or remove a release report).
   const setPlanStatus = async (status) => {
-    await supabase.from('test_plans').update({ status }).eq('id', planId)
+    if (status === plan.status) return
+    if (statusChangeNeedsConfirm(plan.status, status)) { setStatusChange(status); return }
+    const { data, error } = await supabase.from('test_plans').update({ status }).eq('id', planId).select('id')
+    if (error || !data?.length) toast.error(error?.message || "You don't have permission to change this test plan's status.")
+    else toast.success(`${plan.name} is now ${TEST_PLAN_STATUS[status].label}`)
     fetchPlan()
     onRefreshList()
   }
@@ -405,30 +459,26 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
           badge={
             <div className="flex items-center gap-2">
               <StatusBadge domain={TEST_PLAN_STATUS} value={plan.status} />
-              <ReleaseBadge name={plan.release?.name} status={plan.release?.status} onEdit={can('releases.manage') ? () => setShowRelease(true) : undefined} />
+              <ReleaseBadge name={plan.release?.name} onEdit={can('releases.manage') ? () => setShowRelease(true) : undefined} />
             </div>
           }
           subtitle={plan.description || `Created by ${plan.creator?.name || 'someone'}`}
           actions={
             <div className="flex items-center gap-2">
-              {(can('test_plans.edit') || can('test_plans.close')) && (
-                <select
-                  value={plan.status}
-                  onChange={(e) => setPlanStatus(e.target.value)}
-                  disabled={plan.status === 'completed' && !can('test_plans.close')}
-                  className="text-[12px] bg-gray-700 border border-gray-600 rounded-md px-2 py-1.5 outline-none disabled:opacity-60"
-                >
-                  {/* Completing or reopening needs Complete/Close Test Plan; other changes need Edit Test Plan. */}
-                  {Object.entries(TEST_PLAN_STATUS).map(([k, v]) => (
-                    <option
-                      key={k}
-                      value={k}
-                      disabled={k !== plan.status && ((k === 'completed' || plan.status === 'completed') ? !can('test_plans.close') : !can('test_plans.edit'))}
-                    >
-                      {v.label}
-                    </option>
-                  ))}
-                </select>
+              {can('test_plans.close') && (
+                <label className="flex items-center gap-1.5 text-[12px] text-gray-400">
+                  Status
+                  <select
+                    value={plan.status}
+                    onChange={(e) => setPlanStatus(e.target.value)}
+                    aria-label="Test plan status"
+                    className="text-[12px] text-gray-300 bg-gray-700 border border-gray-600 rounded-md px-2 py-1.5 outline-none"
+                  >
+                    {Object.entries(TEST_PLAN_STATUS).map(([k, v]) => (
+                      <option key={k} value={k}>{v.label}</option>
+                    ))}
+                  </select>
+                </label>
               )}
               {can('test_plans.edit') && (
                 <button
@@ -458,21 +508,29 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
             >
               <ArrowLeft size={14} /> All Test Plans
             </button>
-            {plan.release && (
-              <button
-                onClick={() => navigate(`/project/${projectId}/releases/${plan.release.id}`)}
-                className="text-[12px] text-blue-500 hover:underline"
-              >
-                Release {plan.release.name} report →
-              </button>
-            )}
           </div>
 
-          {plan.release?.status === 'completed' && (
-            <p className="rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-[12px] text-gray-300">
-              Release {plan.release.name} is completed and its report is saved. Changes made here don't change that report.
-              To test the next version, change this plan's release version to an open release.
-            </p>
+          {FINAL_STATUSES.includes(plan.status) && (
+            <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-3 py-2 text-[12px] ${
+              plan.status === 'discard' ? 'border-red-500/40 bg-red-500/10' : 'border-green-500/30 bg-green-500/10'
+            }`}>
+              <span className="text-gray-300">
+                <span className={`font-semibold ${plan.status === 'discard' ? 'text-red-500' : 'text-green-600'}`}>
+                  {plan.status === 'discard' ? 'Discarded' : 'Passed'}
+                </span>
+                {' '}for release {plan.release?.name}
+                {plan.status === 'discard' && <> — Reason: <span className="text-white">{plan.discard_reason}</span></>}
+              </span>
+              {plan.status === 'discard' && can('test_plans.close') && (
+                <button onClick={() => setStatusChange('discard')} className="text-gray-400 hover:text-white">Edit reason</button>
+              )}
+              <button
+                onClick={() => navigate(`/project/${projectId}/reports?tab=releases&plan=${plan.id}&release=${plan.release_version_id}`)}
+                className="ml-auto flex items-center gap-1 text-blue-500 hover:underline"
+              >
+                <FileSpreadsheet size={12} /> View release report
+              </button>
+            </div>
           )}
 
           <BentoCard className="p-4">
@@ -552,6 +610,13 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
         userId={userId}
         plan={plan}
         onSaved={() => { setShowEdit(false); fetchPlan(); onRefreshList() }}
+      />
+
+      <TestPlanStatusModal
+        plan={plan}
+        status={statusChange}
+        onClose={() => setStatusChange(null)}
+        onSaved={() => { setStatusChange(null); fetchPlan(); onRefreshList() }}
       />
 
       <ChangeReleaseModal

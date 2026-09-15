@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Tag, Pencil, Trash2, Check, X, Plus, Lock } from 'lucide-react'
+import { Tag, Pencil, Trash2, Check, X, Plus } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import Modal from './ui/Modal'
 import FormField, { inputClass } from './ui/FormField'
@@ -37,9 +37,8 @@ export async function resolveReleaseId(projectId, value, newName) {
   return error ? { error } : { id: data.id, name: data.name }
 }
 
-// Compact "Release Version 12.70" label, with its lifecycle status once it has
-// left Active, and an edit pencil when allowed.
-export function ReleaseBadge({ name, status, onEdit }) {
+// Compact "Release Version 12.70" label, with an edit pencil when allowed.
+export function ReleaseBadge({ name, onEdit }) {
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[12px] whitespace-nowrap ${
@@ -49,10 +48,6 @@ export function ReleaseBadge({ name, status, onEdit }) {
       <Tag size={12} className={name ? 'text-blue-400' : 'text-amber-500'} />
       <span className="text-gray-400">Release Version</span>
       <span className={`font-semibold ${name ? 'text-blue-400' : 'text-amber-500'}`}>{name || 'Not set'}</span>
-      {name && status === 'testing' && <span className="text-[10px] font-semibold text-orange-600">· Testing</span>}
-      {name && status === 'completed' && (
-        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-green-600"><Lock size={9} /> Completed</span>
-      )}
       {onEdit && (
         <button onClick={onEdit} title="Edit Release Version" aria-label="Edit Release Version" className="text-gray-400 hover:text-white">
           <Pencil size={11} />
@@ -76,12 +71,7 @@ export function ReleaseVersionField({ releases, value, onChange, newName, onNewN
       <div className="flex gap-2">
         <select value={value} onChange={(e) => onChange(e.target.value)} required className={inputClass}>
           <option value="">Choose a release version…</option>
-          {sorted.map((r) => (
-            // A completed release's report is saved; no test plan can join it.
-            <option key={r.id} value={r.id} disabled={r.status === 'completed' && r.id !== value}>
-              {r.name}{r.status === 'completed' ? ' (completed)' : r.status === 'testing' ? ' (testing)' : ''}
-            </option>
-          ))}
+          {sorted.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
           {canManage && <option value={NEW_RELEASE}>+ New release version…</option>}
         </select>
         {value === NEW_RELEASE && (
@@ -113,6 +103,8 @@ export function ChangeReleaseModal({ open, onClose, plan, projectId, releases, o
     }
   }, [open, plan])
 
+  const finished = ['pass', 'discard'].includes(plan?.status)
+
   const submit = async (e) => {
     e.preventDefault()
     if (!plan || saving) return
@@ -122,7 +114,7 @@ export function ChangeReleaseModal({ open, onClose, plan, projectId, releases, o
     if (resolved.error) { setSaving(false); toast.error(resolved.error); return }
     const { data, error } = await supabase
       .from('test_plans')
-      .update({ release_version_id: resolved.id })
+      .update({ release_version_id: resolved.id, ...(finished ? { status: 'active' } : {}) })
       .eq('id', plan.id)
       .select('id')
     setSaving(false)
@@ -152,7 +144,14 @@ export function ChangeReleaseModal({ open, onClose, plan, projectId, releases, o
             newName={newName}
             onNewName={setNewName}
           />
-          <p className="text-[11px] text-gray-500">The test plan list, To-Do and exports all show the release version saved here.</p>
+          {finished ? (
+            <p className="text-[11px] text-gray-500">
+              This plan is marked {plan.status === 'pass' ? 'Pass' : 'Discard'} for release {plan.release?.name}. That release report stays in Reports,
+              and the plan starts as Active in the new release version.
+            </p>
+          ) : (
+            <p className="text-[11px] text-gray-500">The test plan list, To-Do and exports all show the release version saved here.</p>
+          )}
           <PrimaryButton type="submit" disabled={saving || !value}>
             {saving ? 'Saving…' : 'Save Release Version'}
           </PrimaryButton>
@@ -163,7 +162,7 @@ export function ChangeReleaseModal({ open, onClose, plan, projectId, releases, o
 }
 
 // Add, rename and delete a project's release versions.
-export function ManageReleasesModal({ open, onClose, projectId, releases, plans = [], planCounts, onChanged }) {
+export function ManageReleasesModal({ open, onClose, projectId, releases, plans, onChanged }) {
   const toast = useToast()
   const [adding, setAdding] = useState('')
   const [editingId, setEditingId] = useState(null)
@@ -174,7 +173,7 @@ export function ManageReleasesModal({ open, onClose, projectId, releases, plans 
     if (open) { setAdding(''); setEditingId(null); setBusy(false) }
   }, [open])
 
-  const planCount = (id) => (planCounts ? planCounts[id] || 0 : plans.filter((p) => p.release_version_id === id).length)
+  const planCount = (id) => plans.filter((p) => p.release_version_id === id).length
 
   const add = async (e) => {
     e.preventDefault()
@@ -237,14 +236,7 @@ export function ManageReleasesModal({ open, onClose, projectId, releases, plans 
                     className={`${inputClass} py-1`}
                   />
                 ) : (
-                  <span className="text-[13px] font-semibold text-white flex-1">
-                    {r.name}
-                    {r.status && r.status !== 'active' && (
-                      <span className={`ml-1.5 text-[10px] font-semibold ${r.status === 'completed' ? 'text-green-600' : 'text-orange-600'}`}>
-                        {r.status === 'completed' ? 'Completed' : 'Testing'}
-                      </span>
-                    )}
-                  </span>
+                  <span className="text-[13px] font-semibold text-white flex-1">{r.name}</span>
                 )}
                 <span className="text-[11px] text-gray-500 whitespace-nowrap">{count} test plan{count === 1 ? '' : 's'}</span>
                 {editingId === r.id ? (
@@ -254,14 +246,7 @@ export function ManageReleasesModal({ open, onClose, projectId, releases, plans 
                   </>
                 ) : (
                   <>
-                    <button
-                      onClick={() => { setEditingId(r.id); setEditName(r.name) }}
-                      disabled={r.status === 'completed'}
-                      title={r.status === 'completed' ? 'A completed release keeps its version' : 'Rename'}
-                      className="p-1 text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:text-gray-400"
-                    >
-                      <Pencil size={12} />
-                    </button>
+                    <button onClick={() => { setEditingId(r.id); setEditName(r.name) }} title="Rename" className="p-1 text-gray-400 hover:text-white"><Pencil size={12} /></button>
                     <button
                       onClick={() => remove(r)}
                       disabled={busy || count > 0}
