@@ -26,6 +26,7 @@ export const AUDIT_ACTIONS = {
   release_deleted: { label: 'Deleted release version' },
   report_exported: { label: 'Exported report' },
   user_joined: { label: 'User signed up' },
+  user_removed: { label: 'Removed user' },
   role_assigned: { label: 'Changed user role' },
   role_created: { label: 'Created role' },
   role_updated: { label: 'Edited role' },
