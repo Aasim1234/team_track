@@ -13,6 +13,7 @@ import FormField, { inputClass } from '../../components/ui/FormField'
 import PrimaryButton from '../../components/ui/Button'
 import { useToast } from '../../components/ui/Toast'
 import { AUDIT_ACTIONS, formatAuditTime } from '../../lib/auditLog'
+import DeleteUserModal from '../../components/DeleteUserModal'
 
 const TABS = ['USERS', 'GROUPS', 'ROLES']
 const BUILT_IN_ORDER = ['admin', 'manager', 'tester', 'viewer']
@@ -29,7 +30,7 @@ const CUSTOM_TONE = 'bg-orange-500/10 text-orange-400 border-orange-500/30'
 const ACCESS_ACTIONS = [
   'user_joined', 'role_assigned', 'role_created', 'role_updated', 'role_deleted',
   'permission_granted', 'permission_revoked', 'group_created', 'group_updated',
-  'group_deleted', 'group_member_added', 'group_member_removed',
+  'group_deleted', 'group_member_added', 'group_member_removed', 'user_removed',
 ]
 
 const smallSelect =
@@ -81,6 +82,8 @@ export default function AdminUsersRolesPage() {
   const [groupModal, setGroupModal] = useState(null)     // { group } | { group: null } for new
   const [membersFor, setMembersFor] = useState(null)     // group whose members are open
   const [roleModal, setRoleModal] = useState(null)       // { role } | { role: null } for new
+  const [deleteFor, setDeleteFor] = useState(null)       // user awaiting delete confirmation
+  const [deleting, setDeleting] = useState(false)
 
   const fetchAll = async () => {
     const results = await Promise.all([
@@ -142,6 +145,27 @@ export default function AdminUsersRolesPage() {
     setUsers((list) => list.map((u) => (u.id === target.id ? { ...u, role_id: roleId } : u)))
     setHistoryVersion((v) => v + 1)
     toast.success(`${target.name} is now ${to.name}`)
+  }
+
+  // Admins only; the database also refuses deleting yourself or another Admin.
+  const deleteBlockedReason = (target) =>
+    target.id === user?.id ? "You can't delete your own account"
+      : roleById[target.role_id]?.key === 'admin' ? "Change an Admin's role before deleting their account"
+        : null
+
+  const deleteUser = async () => {
+    const target = deleteFor
+    if (!target || deleting) return
+    setDeleting(true)
+    const { error } = await supabase.rpc('admin_delete_user', { p_user_id: target.id })
+    setDeleting(false)
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+    setDeleteFor(null)
+    toast.success(`${target.name || target.email} was deleted`)
+    fetchAll()
   }
 
   const filteredUsers = users.filter((u) => {
@@ -265,6 +289,25 @@ export default function AdminUsersRolesPage() {
                     label: 'Joined',
                     render: (u) => new Date(u.created_at).toLocaleDateString(),
                   },
+                  ...(isAdmin ? [{
+                    key: 'actions',
+                    label: '',
+                    width: '48px',
+                    render: (u) => {
+                      const blocked = deleteBlockedReason(u)
+                      return (
+                        <button
+                          onClick={() => setDeleteFor(u)}
+                          disabled={Boolean(blocked)}
+                          title={blocked || `Delete ${u.name || u.email}`}
+                          aria-label={`Delete ${u.name || u.email}`}
+                          className={`${ghostButton} hover:text-red-400 disabled:hover:text-gray-400 disabled:hover:bg-transparent`}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )
+                    },
+                  }] : []),
                 ]}
               />
             </>
@@ -324,6 +367,14 @@ export default function AdminUsersRolesPage() {
           onChanged={fetchAll}
         />
       )}
+
+      <DeleteUserModal
+        target={deleteFor}
+        roleName={deleteFor ? roleById[deleteFor.role_id]?.name : ''}
+        deleting={deleting}
+        onCancel={() => setDeleteFor(null)}
+        onConfirm={deleteUser}
+      />
 
       <RoleModal
         state={roleModal}
