@@ -123,3 +123,18 @@ create policy "Leads can delete test plan items" on test_plan_items
 
 create index if not exists idx_test_plan_items_plan_id on test_plan_items(plan_id);
 create index if not exists idx_test_plan_items_project_id on test_plan_items(project_id);
+
+-- ------------------------------------------------------------ Data API --
+-- From 30 October 2026 Supabase no longer grants new tables in public to the
+-- Data API roles automatically, so this migration names its own grants. These
+-- are the permissions this project runs with today, so re-running this file
+-- changes nothing. Row Level Security (above) is what restricts who sees what;
+-- these grants only make the table reachable through the Data API at all.
+
+grant all on public.test_plans to anon;
+grant all on public.test_plans to authenticated;
+grant all on public.test_plans to service_role;
+
+grant all on public.test_plan_items to anon;
+grant all on public.test_plan_items to authenticated;
+grant all on public.test_plan_items to service_role;

@@ -40,3 +40,14 @@ insert into label_definitions (name, color) values
   ('needs review', 'purple'),
   ('wontfix', 'gray')
 on conflict (name) do nothing;
+
+-- ------------------------------------------------------------ Data API --
+-- From 30 October 2026 Supabase no longer grants new tables in public to the
+-- Data API roles automatically, so this migration names its own grants. These
+-- are the permissions this project runs with today, so re-running this file
+-- changes nothing. Row Level Security (above) is what restricts who sees what;
+-- these grants only make the table reachable through the Data API at all.
+
+grant all on public.label_definitions to anon;
+grant all on public.label_definitions to authenticated;
+grant all on public.label_definitions to service_role;

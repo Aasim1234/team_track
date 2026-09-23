@@ -34,3 +34,14 @@ create policy "Testers can add test case comments" on test_case_comments
   );
 
 create index if not exists idx_test_case_comments_test_case_id on test_case_comments(test_case_id);
+
+-- ------------------------------------------------------------ Data API --
+-- From 30 October 2026 Supabase no longer grants new tables in public to the
+-- Data API roles automatically, so this migration names its own grants. These
+-- are the permissions this project runs with today, so re-running this file
+-- changes nothing. Row Level Security (above) is what restricts who sees what;
+-- these grants only make the table reachable through the Data API at all.
+
+grant all on public.test_case_comments to anon;
+grant all on public.test_case_comments to authenticated;
+grant all on public.test_case_comments to service_role;

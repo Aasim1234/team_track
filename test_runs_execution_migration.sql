@@ -175,3 +175,22 @@ left join lateral (
 ) latest on true;
 
 grant select on test_run_case_current_status to authenticated;
+
+-- ------------------------------------------------------------ Data API --
+-- From 30 October 2026 Supabase no longer grants new tables in public to the
+-- Data API roles automatically, so this migration names its own grants. These
+-- are the permissions this project runs with today, so re-running this file
+-- changes nothing. Row Level Security (above) is what restricts who sees what;
+-- these grants only make the table reachable through the Data API at all.
+
+grant all on public.test_runs to anon;
+grant all on public.test_runs to authenticated;
+grant all on public.test_runs to service_role;
+
+grant all on public.test_run_cases to anon;
+grant all on public.test_run_cases to authenticated;
+grant all on public.test_run_cases to service_role;
+
+grant all on public.test_results to anon;
+grant all on public.test_results to authenticated;
+grant all on public.test_results to service_role;

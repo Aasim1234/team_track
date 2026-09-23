@@ -52,3 +52,22 @@ create policy "Authenticated users full access" on goals
 create index if not exists idx_plan_projects_project_id on plan_projects(project_id);
 create index if not exists idx_goals_project_id on goals(project_id);
 create index if not exists idx_goals_owner_id on goals(owner_id);
+
+-- ------------------------------------------------------------ Data API --
+-- From 30 October 2026 Supabase no longer grants new tables in public to the
+-- Data API roles automatically, so this migration names its own grants. These
+-- are the permissions this project runs with today, so re-running this file
+-- changes nothing. Row Level Security (above) is what restricts who sees what;
+-- these grants only make the table reachable through the Data API at all.
+
+grant all on public.plans to anon;
+grant all on public.plans to authenticated;
+grant all on public.plans to service_role;
+
+grant all on public.plan_projects to anon;
+grant all on public.plan_projects to authenticated;
+grant all on public.plan_projects to service_role;
+
+grant all on public.goals to anon;
+grant all on public.goals to authenticated;
+grant all on public.goals to service_role;

@@ -39,3 +39,18 @@ create policy "Authenticated users full access" on project_docs
 -- 4. Indexes
 create index if not exists idx_project_repos_project_id on project_repos(project_id);
 create index if not exists idx_project_docs_project_id on project_docs(project_id);
+
+-- ------------------------------------------------------------ Data API --
+-- From 30 October 2026 Supabase no longer grants new tables in public to the
+-- Data API roles automatically, so this migration names its own grants. These
+-- are the permissions this project runs with today, so re-running this file
+-- changes nothing. Row Level Security (above) is what restricts who sees what;
+-- these grants only make the table reachable through the Data API at all.
+
+grant all on public.project_repos to anon;
+grant all on public.project_repos to authenticated;
+grant all on public.project_repos to service_role;
+
+grant all on public.project_docs to anon;
+grant all on public.project_docs to authenticated;
+grant all on public.project_docs to service_role;

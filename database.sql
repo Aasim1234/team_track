@@ -91,3 +91,27 @@ create index if not exists idx_issues_project_id on issues(project_id);
 create index if not exists idx_issues_status on issues(status);
 create index if not exists idx_issues_assignee_id on issues(assignee_id);
 create index if not exists idx_comments_issue_id on comments(issue_id);
+
+-- ------------------------------------------------------------ Data API --
+-- From 30 October 2026 Supabase no longer grants new tables in public to the
+-- Data API roles automatically, so this migration names its own grants. These
+-- are the permissions this project runs with today, so re-running this file
+-- changes nothing. Row Level Security (above) is what restricts who sees what;
+-- these grants only make the table reachable through the Data API at all.
+
+grant references, select, trigger, truncate on public.profiles to anon;
+grant references, select, trigger, truncate on public.profiles to authenticated;
+grant update (name, role_id) on public.profiles to authenticated;
+grant all on public.profiles to service_role;
+
+grant all on public.projects to anon;
+grant all on public.projects to authenticated;
+grant all on public.projects to service_role;
+
+grant all on public.issues to anon;
+grant all on public.issues to authenticated;
+grant all on public.issues to service_role;
+
+grant all on public.comments to anon;
+grant all on public.comments to authenticated;
+grant all on public.comments to service_role;
