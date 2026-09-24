@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { CheckSquare, CheckCircle2, XCircle, RotateCcw, ExternalLink, MessageSquareWarning, Search, X } from 'lucide-react'
+import { CheckSquare, CheckCircle2, XCircle, RotateCcw, ExternalLink, MessageSquareWarning, MessageSquare, Search, X } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { fetchAllRows } from '../lib/fetchAllRows'
 import { useAuth } from '../hooks/useAuth'
@@ -26,6 +26,9 @@ const TASK_FIELDS =
   'plan:test_plans(id, name, release:release_versions(name)), assigner:profiles!assigned_by(id, name)'
 
 const REASON_RESULTS = ['fail', 'blocked']
+// Fail and Blocked need a reason before the result is recorded; every other
+// result can carry an optional comment.
+const commentKind = (result) => (REASON_RESULTS.includes(result) ? result : 'comment')
 const STAYS_OPEN_RESULTS = ['fail', 'blocked', 'retest']
 
 const RESULT_CLASS = {
@@ -75,7 +78,7 @@ export default function TodoPage() {
   // Kept after close so dialogs don't blank out while they animate away.
   const lastTaskRef = useRef(null)
   const reasonStatusRef = useRef('fail')
-  if (reasonFor) reasonStatusRef.current = reasonFor.status
+  if (reasonFor) reasonStatusRef.current = commentKind(reasonFor.status)
 
   const fetchTasks = useCallback(async () => {
     if (!user) return
@@ -200,7 +203,10 @@ export default function TodoPage() {
   }
 
   const confirmReason = (comment) =>
-    save({ result: reasonFor.status, failure_comment: comment }, `Marked as ${VMS_RESULT[reasonFor.status]?.label}`)
+    save({ result: reasonFor.status, failure_comment: comment || null },
+      REASON_RESULTS.includes(reasonFor.status)
+        ? `Marked as ${VMS_RESULT[reasonFor.status]?.label}`
+        : comment ? 'Comment saved' : 'Comment removed')
 
   const setTaskStatus = async (status) => {
     if (status === 'closed' && !confirm('Close this task without completing it? The test case and its result stay as they are.')) return
@@ -367,7 +373,7 @@ export default function TodoPage() {
                       </td>
                       <td className="px-2.5 py-2">
                         <StatusBadge domain={VMS_RESULT} value={t.result || 'not_tested'} size="sm" />
-                        {REASON_RESULTS.includes(t.result) && t.failure_comment && (
+                        {t.failure_comment && (
                           <p className="text-[11px] text-gray-500 mt-1 line-clamp-2" title={t.failure_comment}>{t.failure_comment}</p>
                         )}
                       </td>
@@ -488,17 +494,21 @@ export default function TodoPage() {
                     <option key={key} value={key} className="bg-gray-800 text-gray-300">{cfg.label}</option>
                   ))}
                 </select>
-                {REASON_RESULTS.includes(shown.result) && (
-                  <button
-                    onClick={() => setReasonFor({ status: shown.result, existing: shown.failure_comment || '' })}
-                    title="Edit reason"
-                    disabled={!canExecute}
-                    className="flex items-start gap-1.5 text-left text-[12px] text-gray-300 hover:text-white min-w-0 disabled:pointer-events-none"
-                  >
+                <button
+                  onClick={() => setReasonFor({ status: shown.result || 'not_tested', existing: shown.failure_comment || '' })}
+                  title={REASON_RESULTS.includes(shown.result) ? 'Edit reason' : 'Add a comment'}
+                  disabled={!canExecute}
+                  className="flex items-start gap-1.5 text-left text-[12px] text-gray-300 hover:text-white min-w-0 disabled:pointer-events-none"
+                >
+                  {REASON_RESULTS.includes(shown.result) ? (
                     <MessageSquareWarning size={13} className={`mt-0.5 flex-shrink-0 ${shown.result === 'fail' ? 'text-red-400' : 'text-orange-400'}`} />
-                    <span className="line-clamp-3">{shown.failure_comment || 'Add reason'}</span>
-                  </button>
-                )}
+                  ) : (
+                    <MessageSquare size={13} className="mt-0.5 flex-shrink-0 text-gray-500" />
+                  )}
+                  <span className="line-clamp-3">
+                    {shown.failure_comment || (REASON_RESULTS.includes(shown.result) ? 'Add reason' : 'Add comment')}
+                  </span>
+                </button>
               </div>
               {shown.task_status === 'open' && (
                 <p className="text-[11px] text-gray-500 mt-1.5">

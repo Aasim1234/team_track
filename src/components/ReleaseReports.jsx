@@ -273,7 +273,7 @@ function ReleaseReportView({ report, onBack }) {
                     <th className="py-1.5 pr-3 font-semibold">Topic</th>
                     <th className="py-1.5 pr-3 font-semibold">Scenario</th>
                     <th className="py-1.5 pr-3 font-semibold">Result</th>
-                    <th className="py-1.5 pr-3 font-semibold">Fail / Block Comment</th>
+                    <th className="py-1.5 pr-3 font-semibold">Comment / Reason</th>
                     <th className="py-1.5 font-semibold">By</th>
                   </tr>
                 </thead>

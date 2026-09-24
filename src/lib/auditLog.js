@@ -6,6 +6,7 @@ export const AUDIT_ACTIONS = {
   result_changed: { label: 'Changed result' },
   failure_comment_edited: { label: 'Edited failure reason' },
   block_reason_edited: { label: 'Edited block reason' },
+  comment_edited: { label: 'Edited comment' },
   row_edited: { label: 'Edited test case' },
   row_added: { label: 'Added test case' },
   row_deleted: { label: 'Deleted test case' },

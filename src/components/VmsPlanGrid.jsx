@@ -1,5 +1,5 @@
 import { Fragment, useState, useMemo, useRef, useEffect } from 'react'
-import { Plus, Search, X, MessageSquareWarning, Pencil, Check, Lock, UserPlus, UserCheck, Trash2, Upload, Download } from 'lucide-react'
+import { Plus, Search, X, MessageSquareWarning, MessageSquare, Pencil, Check, Lock, UserPlus, UserCheck, Trash2, Upload, Download } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useToast } from './ui/Toast'
 import { VMS_RESULT } from '../lib/statusConfig'
@@ -22,6 +22,9 @@ const RESULT_CLASS = {
 
 // Results that cannot be recorded without a reason.
 const REASON_RESULTS = ['fail', 'blocked']
+// Fail and Blocked ask for a reason up front; any other result can be given
+// a comment afterwards, which is what the dialog below edits.
+const commentKind = (result) => (REASON_RESULTS.includes(result) ? result : 'comment')
 const REASON_ICON_CLASS = { fail: 'text-red-400/70', blocked: 'text-orange-400/70' }
 
 // Assignment and its To-Do task are kept together by the database.
@@ -93,7 +96,7 @@ export default function VmsPlanGrid({ planId, planName = 'this test plan', proje
   if (sectionFor) lastSectionRef.current = sectionFor
   // Kept after close so the dialog doesn't switch colours while it animates out.
   const reasonStatusRef = useRef('fail')
-  if (reasonFor) reasonStatusRef.current = reasonFor.status
+  if (reasonFor) reasonStatusRef.current = commentKind(reasonFor.status)
 
   // Rows are read-only until their Edit button is clicked; one row at a time.
   const [editingId, setEditingId] = useState(null)
@@ -245,7 +248,7 @@ export default function VmsPlanGrid({ planId, planName = 'this test plan', proje
     if (!row) return false
     const { data, error } = await supabase
       .from('vms_test_plan_rows')
-      .update({ result: reasonFor.status, failure_comment: comment })
+      .update({ result: reasonFor.status, failure_comment: comment || null })
       .eq('id', row.id)
       .select('id, result, failure_comment, failed_at')
       .single()
@@ -699,23 +702,30 @@ export default function VmsPlanGrid({ planId, planName = 'this test plan', proje
                         <option key={key} value={key} className="bg-gray-800 text-gray-300">{cfg.label}</option>
                       ))}
                     </select>
-                    {REASON_RESULTS.includes(row.result) && (
-                      canRun ? (
+                    {/* A reason for Fail and Blocked, an optional comment for any
+                        other result — a passed test can carry a note too. */}
+                    {(() => {
+                      const needsReason = REASON_RESULTS.includes(row.result)
+                      if (!needsReason && !canRun && !row.failure_comment) return null
+                      const Icon = needsReason ? MessageSquareWarning : MessageSquare
+                      const tone = needsReason ? REASON_ICON_CLASS[row.result] : 'text-gray-500'
+                      const empty = needsReason ? 'Add reason' : 'Add comment'
+                      return canRun ? (
                         <button
-                          onClick={() => setReasonFor({ row, status: row.result, existing: row.failure_comment || '' })}
-                          title={row.failure_comment || ''}
+                          onClick={() => setReasonFor({ row, status: row.result || 'not_tested', existing: row.failure_comment || '' })}
+                          title={row.failure_comment || (needsReason ? 'Add a reason' : 'Add a comment')}
                           className="mt-0.5 flex items-start gap-1 text-left text-[10px] text-gray-400 hover:text-gray-300 w-full"
                         >
-                          <MessageSquareWarning size={11} className={`mt-px flex-shrink-0 ${REASON_ICON_CLASS[row.result]}`} />
-                          <span className="line-clamp-2">{row.failure_comment || 'Add reason'}</span>
+                          <Icon size={11} className={`mt-px flex-shrink-0 ${tone}`} />
+                          <span className="line-clamp-2">{row.failure_comment || empty}</span>
                         </button>
                       ) : (
                         <div title={row.failure_comment || ''} className="mt-0.5 flex items-start gap-1 text-[10px] text-gray-400 w-full">
-                          <MessageSquareWarning size={11} className={`mt-px flex-shrink-0 ${REASON_ICON_CLASS[row.result]}`} />
+                          <Icon size={11} className={`mt-px flex-shrink-0 ${tone}`} />
                           <span className="line-clamp-2">{row.failure_comment || '—'}</span>
                         </div>
                       )
-                    )}
+                    })()}
                     {assignment(row)}
                   </td>
                   <td className="py-1 px-1">

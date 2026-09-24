@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { AlertTriangle, Ban } from 'lucide-react'
+import { AlertTriangle, Ban, MessageSquare } from 'lucide-react'
 import Modal from './ui/Modal'
 import FormField, { inputClass } from './ui/FormField'
 
@@ -16,6 +16,7 @@ const KINDS = {
     label: 'Failure Comment / Reason',
     placeholder: 'What failed, and under what conditions?',
     confirm: 'Mark as Failed',
+    confirmEdit: 'Save Reason',
     icon: AlertTriangle,
     banner: 'bg-red-500/5 border-red-500/20',
     iconClass: 'text-red-400',
@@ -28,18 +29,34 @@ const KINDS = {
     label: 'Block Reason / Comment',
     placeholder: 'What is blocking this test, and what is needed to unblock it?',
     confirm: 'Mark as Blocked',
+    confirmEdit: 'Save Reason',
     icon: Ban,
     banner: 'bg-orange-500/5 border-orange-500/20',
     iconClass: 'text-orange-400',
     button: 'bg-orange-500 hover:bg-orange-400 disabled:hover:bg-orange-500',
     hint: 'text-orange-400',
   },
+  // Any other result: a comment is welcome but never required.
+  comment: {
+    title: 'Add Comment',
+    editTitle: 'Edit Comment',
+    label: 'Comment',
+    placeholder: 'Anything worth noting — what you checked, the build, a workaround…',
+    confirm: 'Save Comment',
+    confirmEdit: 'Save Comment',
+    icon: MessageSquare,
+    banner: 'bg-blue-500/5 border-blue-500/20',
+    iconClass: 'text-blue-400',
+    button: 'bg-blue-500 hover:bg-blue-400 disabled:hover:bg-blue-500',
+    hint: 'text-gray-500',
+    optional: true,
+  },
 }
 
 export default function FailCommentModal({ open, onClose, row, existing, onConfirm, status = 'fail' }) {
   const [comment, setComment] = useState('')
   const [saving, setSaving] = useState(false)
-  const kind = KINDS[status] || KINDS.fail
+  const kind = KINDS[status] || KINDS.comment
   const Icon = kind.icon
 
   useEffect(() => {
@@ -49,7 +66,7 @@ export default function FailCommentModal({ open, onClose, row, existing, onConfi
     }
   }, [open, existing])
 
-  const valid = hasMeaningfulComment(comment)
+  const valid = kind.optional || hasMeaningfulComment(comment)
   const isEdit = Boolean(existing)
 
   const submit = async (e) => {
@@ -86,6 +103,9 @@ export default function FailCommentModal({ open, onClose, row, existing, onConfi
         {comment.length > 0 && !valid && (
           <p className={`text-[11px] ${kind.hint}`}>A reason is required — whitespace alone is not enough.</p>
         )}
+        {kind.optional && (
+          <p className="text-[11px] text-gray-500">Optional. Saving it empty removes the comment.</p>
+        )}
 
         <div className="flex items-center justify-end gap-2 pt-1">
           <button
@@ -100,7 +120,7 @@ export default function FailCommentModal({ open, onClose, row, existing, onConfi
             disabled={!valid || saving}
             className={`px-3 py-1.5 rounded-md text-[12px] font-semibold text-white disabled:opacity-40 disabled:cursor-not-allowed ${kind.button}`}
           >
-            {saving ? 'Saving…' : isEdit ? 'Save Reason' : kind.confirm}
+            {saving ? 'Saving…' : isEdit ? kind.confirmEdit || kind.confirm : kind.confirm}
           </button>
         </div>
       </form>

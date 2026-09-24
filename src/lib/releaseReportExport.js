@@ -238,7 +238,7 @@ export function buildReleaseReportWorkbook(report, results, meta) {
           { key: 'steps', label: 'Test Steps', width: 50 },
           { key: 'expected', label: 'Expected Result', width: 44 },
           { key: 'result', label: 'Result', width: 11, type: 'result' },
-          { key: 'reason', label: 'Fail / Block Comment', width: 40 },
+          { key: 'reason', label: 'Comment / Reason', width: 40 },
           { key: 'recorded', label: 'Failed / Blocked By', width: 24 },
           { key: 'assignee', label: 'Assigned To', width: 16 },
         ],
@@ -256,7 +256,7 @@ export function buildReleaseReportWorkbook(report, results, meta) {
           { key: 'topic', label: 'Topic', width: 24 },
           { key: 'scenario', label: 'Scenario', width: 40 },
           { key: 'result', label: 'Result', width: 11, type: 'result' },
-          { key: 'reason', label: 'Fail / Block Comment', width: 60 },
+          { key: 'reason', label: 'Fail / Block Reason', width: 60 },
           { key: 'recorded', label: 'Failed / Blocked By', width: 26 },
         ],
         rows: rows.filter((c) => c.result === 'fail' || c.result === 'blocked')

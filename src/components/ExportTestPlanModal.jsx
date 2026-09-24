@@ -21,7 +21,7 @@ const COLUMNS = [
   { key: 'result', label: 'RESULT', width: 18 },
 ]
 
-const FAILURE_COLUMN = { key: 'failure_comment', label: 'Fail / Block Reason', width: 45 }
+const FAILURE_COLUMN = { key: 'failure_comment', label: 'Comment / Reason', width: 45 }
 
 export default function ExportTestPlanModal({ open, onClose, planId, planName, plans, generatedBy, releaseVersion }) {
   const toast = useToast()
@@ -60,7 +60,7 @@ export default function ExportTestPlanModal({ open, onClose, planId, planName, p
       test_steps: r.test_steps || '',
       expected_result: r.expected_result || '',
       result: VMS_RESULT[r.result]?.label || 'Untested',
-      failure_comment: ['fail', 'blocked'].includes(r.result) ? (r.failure_comment || '') : '',
+      failure_comment: r.failure_comment || '',
     }))
   }
 

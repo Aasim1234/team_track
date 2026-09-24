@@ -18,7 +18,7 @@ export const TEMPLATE_COLUMNS = [
   { key: 'result', label: 'RESULT', width: 14 },
 ]
 
-const REASON_COLUMN = { key: 'reason', label: 'Fail / Block Reason', width: 40 }
+const REASON_COLUMN = { key: 'reason', label: 'Comment / Reason', width: 40 }
 
 // What a header cell may say for each column. Anything else is ignored.
 const HEADER_ALIASES = {
@@ -27,7 +27,7 @@ const HEADER_ALIASES = {
   test_steps: ['test steps', 'steps', 'step', 'test step'],
   expected_result: ['expected result', 'expected', 'expected results', 'expected outcome'],
   result: ['result', 'status', 'test result'],
-  reason: ['fail / block reason', 'fail reason', 'failure reason', 'block reason', 'comment', 'failure comment'],
+  reason: ['comment / reason', 'comment', 'fail / block reason', 'fail reason', 'failure reason', 'block reason', 'failure comment', 'notes', 'note'],
 }
 
 const RESULT_ALIASES = {
@@ -139,7 +139,7 @@ export function buildImport(grid, existingRows = []) {
       test_steps: steps,
       expected_result: expected,
       result: result || 'not_tested',
-      reason: ['fail', 'blocked'].includes(result) ? reason || null : null,
+      reason: reason || null,
       duplicate: duplicateOfPlan || duplicateInFile,
       duplicateInFile,
     })
@@ -190,7 +190,7 @@ export function downloadImportTemplate() {
         { note: 'Scenario, Test Steps and Expected Result must not be empty.' },
         { note: 'Use line breaks (Alt+Enter in Excel) inside Test Steps and Expected Result — they are kept exactly as typed.' },
         { note: `RESULT accepts: ${RESULT_LABELS.join(', ')} ("Not Tested" works too). Leave it empty for Untested.` },
-        { note: 'A Fail result needs a reason. Add an optional sixth column called "Fail / Block Reason" if you are importing failures.' },
+        { note: 'Add an optional sixth column called "Comment / Reason" for notes. It is required for a Fail result and kept for any other result too.' },
         { note: 'Save the file as .xlsx or CSV, then use Import Test Cases in the test plan.' },
       ],
     },
