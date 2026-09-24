@@ -8,18 +8,24 @@ export default function AnimatedNumber({ value, duration = 0.6 }) {
   const isNumeric = typeof value === 'number' && Number.isFinite(value)
   const ref = useRef(null)
   const motionValue = useMotionValue(0)
-  const spring = useSpring(motionValue, { duration: duration * 1000, bounce: 0 })
-
-  useEffect(() => {
-    if (isNumeric) motionValue.set(value)
-  }, [value, isNumeric, motionValue])
+  // framer-motion takes a spring's duration in seconds; passing milliseconds
+  // stretched every count-up to ten minutes, so tiles sat on 0.
+  const spring = useSpring(motionValue, { duration, bounce: 0 })
 
   useEffect(() => {
     if (!isNumeric) return undefined
-    return spring.on('change', (v) => {
+    const paint = (v) => {
       if (ref.current) ref.current.textContent = Math.round(v).toLocaleString()
-    })
-  }, [spring, isNumeric])
+    }
+    // Subscribe before setting the target so no update is missed, and paint the
+    // final number once the animation is due to be over: a tab that gets no
+    // animation frames (a background tab, a window that isn't drawing) would
+    // otherwise leave the tile showing 0 for good.
+    const stop = spring.on('change', paint)
+    motionValue.set(value)
+    const settle = setTimeout(() => paint(value), duration * 1000 + 300)
+    return () => { stop(); clearTimeout(settle) }
+  }, [spring, motionValue, value, isNumeric, duration])
 
   if (!isNumeric) return <>{value}</>
 

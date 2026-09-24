@@ -2,10 +2,9 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Users, ListChecks, CheckCircle2, Clock, AlertTriangle, TrendingUp, Timer, Loader,
-  Eye, LayoutGrid, Rows3, Trophy,
+  Eye, LayoutGrid, Rows3, Trophy, PlayCircle, Inbox,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabaseClient'
-import { fetchAllRows } from '../../lib/fetchAllRows'
 import AdminSidebar from '../../components/AdminSidebar'
 import AppHeader from '../../components/AppHeader'
 import PageHeader from '../../components/PageHeader'
@@ -15,7 +14,7 @@ import StatCard from '../../components/ui/StatCard'
 import ProgressRing from '../../components/ui/ProgressRing'
 import TeamMemberCard from '../../components/TeamMemberCard'
 import { MEMBER_STATUS, PROJECT_MEMBER_ROLE } from '../../lib/statusConfig'
-import { computeMemberStats, isToday, toDate, timeAgo } from '../../lib/performanceScore'
+import { browserTimeZone, timeAgo } from '../../lib/performanceScore'
 
 function MiniBar({ label, pct, color }) {
   return (
@@ -31,75 +30,26 @@ function MiniBar({ label, pct, color }) {
 
 export default function AdminTeamPerformancePage() {
   const navigate = useNavigate()
-  const [issues, setIssues] = useState([])
-  const [results, setResults] = useState([])
-  const [memberships, setMemberships] = useState([])
-  const [sprints, setSprints] = useState([])
+  const [members, setMembers] = useState([])
+  const [summary, setSummary] = useState(null)
+  const [loadError, setLoadError] = useState(null)
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState('table')
 
+  // Every figure comes from team_performance(), which reads the real
+  // assignments, To-Do task status, recorded results and activity log.
   useEffect(() => {
-    const fetchAll = async () => {
-      const [{ data: issueRows }, { data: resultRows }, { data: memberRows }, { data: sprintRows }, { data: roleRows }, { data: profileRoles }] = await Promise.all([
-        supabase.from('issues').select('id, title, type, status, assignee_id, reporter_id, due_date, created_at, updated_at, project_id, sprint_id'),
-        fetchAllRows(() => supabase.from('test_results').select('id, executed_by, status, executed_at, elapsed_minutes').order('id')),
-        supabase.from('project_members').select('user_id, role, project_id, profiles(id, name, email), projects(name, key)'),
-        supabase.from('sprints').select('id, project_id, status').eq('status', 'active'),
-        supabase.from('roles').select('id, name'),
-        supabase.from('profiles').select('id, role_id'),
-      ])
-      setIssues(issueRows || [])
-      setResults(resultRows || [])
-      const roleName = Object.fromEntries((roleRows || []).map((r) => [r.id, r.name]))
-      const roleOf = Object.fromEntries((profileRoles || []).map((p) => [p.id, roleName[p.role_id]]))
-      setMemberships((memberRows || []).map((m) => (m.profiles ? { ...m, profiles: { ...m.profiles, role_name: roleOf[m.profiles.id] } } : m)))
-      setSprints(sprintRows || [])
+    supabase.rpc('team_performance', { p_timezone: browserTimeZone() }).then(({ data, error }) => {
+      if (error) setLoadError(error.message)
+      else {
+        setMembers(data?.members || [])
+        setSummary(data?.summary || null)
+      }
       setLoading(false)
-    }
-    fetchAll()
+    })
   }, [])
 
-  const members = useMemo(() => {
-    const byUser = {}
-    memberships.forEach((m) => {
-      if (!m.profiles) return
-      byUser[m.profiles.id] = byUser[m.profiles.id] || { profile: m.profiles, memberships: [] }
-      byUser[m.profiles.id].memberships.push(m)
-    })
-
-    const activeSprintIds = new Set(sprints.map((s) => s.id))
-
-    const rows = Object.values(byUser).map(({ profile, memberships: mems }) =>
-      computeMemberStats(profile, mems, { issues, results, activeSprintIds })
-    )
-
-    return rows.sort((a, b) => a.name.localeCompare(b.name))
-  }, [issues, results, memberships, sprints])
-
   const maxCompletedToday = Math.max(1, ...members.map((m) => m.completedToday))
-
-  const summary = useMemo(() => {
-    const done = issues.filter((i) => i.status === 'done')
-    const avgCloseDays = done.length
-      ? done.reduce((sum, i) => {
-          const created = toDate(i.created_at)
-          const updated = toDate(i.updated_at)
-          if (!created || !updated) return sum
-          return sum + (updated.getTime() - created.getTime()) / 86400000
-        }, 0) / done.length
-      : 0
-
-    return {
-      totalMembers: members.length,
-      totalAssigned: issues.filter((i) => i.assignee_id).length,
-      completedToday: issues.filter((i) => i.status === 'done' && isToday(i.updated_at)).length,
-      inProgress: issues.filter((i) => ['in_progress', 'in_review'].includes(i.status)).length,
-      pending: issues.filter((i) => i.status === 'todo').length,
-      overdue: issues.filter((i) => i.due_date && new Date(i.due_date) < new Date() && i.status !== 'done').length,
-      productivity: issues.length ? Math.round((done.length / issues.length) * 100) : 0,
-      avgCloseDays: avgCloseDays.toFixed(1),
-    }
-  }, [issues, members.length])
 
   const openProfile = (member) => navigate(`/admin/team-performance/${member.id}`)
 
@@ -138,34 +88,42 @@ export default function AdminTeamPerformancePage() {
         />
 
         <div className="p-6">
-          {loading ? (
+          {loadError && (
+            <p className="mb-5 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2.5 text-[12px] text-red-500">
+              {loadError}
+            </p>
+          )}
+
+          {loading || !summary ? (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
               {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-20 bg-gray-700 rounded-lg animate-pulse" />)}
             </div>
           ) : (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
               <StatCard icon={Users} label="Total Team Members" value={summary.totalMembers} tint="bg-blue-50 text-blue-600" />
-              <StatCard icon={ListChecks} label="Total Assigned Tasks" value={summary.totalAssigned} tint="bg-gray-100 text-gray-600" />
+              <StatCard icon={ListChecks} label="Total Assigned Test Cases" value={summary.totalAssigned} tint="bg-gray-100 text-gray-600" />
               <StatCard icon={CheckCircle2} label="Tasks Completed Today" value={summary.completedToday} tint="bg-green-50 text-green-600" />
               <StatCard icon={Loader} label="Tasks In Progress" value={summary.inProgress} tint="bg-blue-50 text-blue-600" />
               <StatCard icon={Clock} label="Pending Tasks" value={summary.pending} tint="bg-orange-50 text-orange-600" />
               <StatCard icon={AlertTriangle} label="Overdue Tasks" value={summary.overdue} tint="bg-red-50 text-red-600" />
               <StatCard icon={TrendingUp} label="Team Productivity" value={`${summary.productivity}%`} tint="bg-purple-50 text-purple-600" />
               <StatCard icon={Timer} label="Avg. Time to Close" value={`${summary.avgCloseDays}d`} tint="bg-gray-100 text-gray-600" />
+              <StatCard icon={PlayCircle} label="Tests Executed" value={summary.testsExecuted} tint="bg-blue-50 text-blue-600" />
+              <StatCard icon={Inbox} label="Unassigned Test Cases" value={summary.unassignedCases} tint="bg-orange-50 text-orange-600" />
             </div>
           )}
 
           {viewMode === 'cards' && !loading && (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
               {members.map((m) => <TeamMemberCard key={m.id} member={m} />)}
-              {members.length === 0 && <p className="text-[13px] text-gray-500 text-center py-10 col-span-full">No team members yet — add members to a project from Users &amp; Roles.</p>}
+              {members.length === 0 && <p className="text-[13px] text-gray-500 text-center py-10 col-span-full">No users yet — add people from Users &amp; Roles.</p>}
             </div>
           )}
 
           {viewMode === 'leaderboard' && !loading && (
             <div className="space-y-2 max-w-xl">
               {leaderboard.map((m, i) => <TeamMemberCard key={m.id} member={m} rank={i + 1} />)}
-              {leaderboard.length === 0 && <p className="text-[13px] text-gray-500 text-center py-10">No team members yet — add members to a project from Users &amp; Roles.</p>}
+              {leaderboard.length === 0 && <p className="text-[13px] text-gray-500 text-center py-10">No users yet — add people from Users &amp; Roles.</p>}
             </div>
           )}
 
@@ -177,7 +135,7 @@ export default function AdminTeamPerformancePage() {
             onRowClick={openProfile}
             stickyHeader
             maxHeight="65vh"
-            emptyState={<p className="text-[13px] text-gray-500 text-center py-10">No team members yet — add members to a project from Users &amp; Roles.</p>}
+            emptyState={<p className="text-[13px] text-gray-500 text-center py-10">No users yet — add people from Users &amp; Roles.</p>}
             columns={[
               {
                 key: 'name', label: 'Employee',
@@ -202,26 +160,23 @@ export default function AdminTeamPerformancePage() {
               },
               { key: 'total', label: 'Assigned' },
               { key: 'completed', label: 'Completed' },
-              { key: 'remaining', label: 'Remaining' },
+              { key: 'remaining', label: 'Remaining', render: (m) => m.remaining > 0 ? `${m.remaining} (${m.inProgress} in progress)` : '0' },
               { key: 'testsExecuted', label: 'Tests Executed' },
               { key: 'bugsReported', label: 'Bugs Reported' },
               { key: 'bugsFixed', label: 'Bugs Fixed' },
               { key: 'activeProjects', label: 'Projects' },
-              {
-                key: 'loggedMinutesToday', label: 'Logged Today',
-                render: (m) => m.loggedMinutesToday > 0 ? `${Math.floor(m.loggedMinutesToday / 60)}h ${m.loggedMinutesToday % 60}m` : '—',
-              },
+              { key: 'actionsToday', label: 'Actions Today', render: (m) => m.actionsToday > 0 ? m.actionsToday : '—' },
               {
                 key: 'progress', label: 'Progress', width: '170px',
                 render: (m) => (
                   <div className="space-y-1 py-1">
-                    <MiniBar label="TC" pct={m.taskCompletionPct} color="bg-blue-500" />
+                    <MiniBar label="TC" pct={m.total > 0 ? m.taskCompletionPct : null} color="bg-blue-500" />
                     <MiniBar label="DP" pct={Math.round((m.completedToday / maxCompletedToday) * 100)} color="bg-green-500" />
-                    <MiniBar label="SP" pct={m.sprintProgress} color="bg-purple-500" />
+                    <MiniBar label="PR" pct={m.passRate} color="bg-purple-500" />
                   </div>
                 ),
               },
-              { key: 'lastActivity', label: 'Last Activity', render: (m) => timeAgo(m.lastActivity?.toISOString()) },
+              { key: 'lastActivity', label: 'Last Activity', render: (m) => timeAgo(m.lastActivity) },
               { key: 'status', label: 'Status', render: (m) => <StatusBadge domain={MEMBER_STATUS} value={m.status} dot /> },
               { key: 'overdue', label: 'Due', render: (m) => m.overdue > 0 ? <span className="text-red-600 font-medium">{m.overdue}</span> : '0' },
               {
@@ -244,9 +199,14 @@ export default function AdminTeamPerformancePage() {
           )}
 
           {viewMode === 'table' && (
-          <p className="text-[11px] text-gray-500 mt-3">
-            TC = Task Completion · DP = Daily Productivity (relative to today's top performer) · SP = Sprint Progress (active sprint only)
-          </p>
+          <div className="text-[11px] text-gray-500 mt-3 space-y-1">
+            <p>TC = Task Completion · DP = Daily Productivity (relative to today's top performer) · PR = Pass Rate of the results they recorded</p>
+            <p>
+              Assigned, Completed and Remaining come from test cases assigned to each person and their To-Do task status.
+              Tests Executed, Bugs Reported / Fixed, Actions Today and Last Activity come from the activity log.
+              A task counts as overdue once its test plan's target date has passed.
+            </p>
+          </div>
           )}
         </div>
       </div>

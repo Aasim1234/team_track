@@ -1,4 +1,9 @@
-const ROLE_RANK = { admin: 4, lead: 3, tester: 2, viewer: 1 }
+// Formatting helpers for the Team Performance pages.
+//
+// The figures themselves are not computed here: team_performance() and
+// member_performance() build them in the database from assignments, To-Do task
+// status, recorded results and the activity log, so the page, the member
+// profile and anyone else reading the data see the same numbers.
 
 export function toDate(dateStr) {
   if (!dateStr) return null
@@ -24,113 +29,34 @@ export function timeAgo(dateStr) {
   return `${Math.floor(hours / 24)}d ago`
 }
 
-// Single source of truth for a team member's derived performance stats —
-// used by both the Team Performance list/leaderboard and the per-member
-// profile page so the numbers never drift between the two views.
-export function computeMemberStats(profile, mems, { issues, results, activeSprintIds }) {
-  // The app-wide role when known (Users & Roles); older data falls back to the strongest project role.
-  const role = profile.role_name || mems.reduce((best, m) => (ROLE_RANK[m.role] > ROLE_RANK[best] ? m.role : best), 'viewer')
-  const myIssues = issues.filter((i) => i.assignee_id === profile.id)
-  const myBugsReported = issues.filter((i) => i.type === 'bug' && i.reporter_id === profile.id)
-  const myBugsFixed = issues.filter((i) => i.type === 'bug' && i.assignee_id === profile.id && i.status === 'done')
-  const myResults = results.filter((r) => r.executed_by === profile.id)
-  const myResultsToday = myResults.filter((r) => isToday(r.executed_at))
-
-  const total = myIssues.length
-  const completed = myIssues.filter((i) => i.status === 'done').length
-  const remaining = total - completed
-  const overdue = myIssues.filter((i) => i.due_date && new Date(i.due_date) < new Date() && i.status !== 'done').length
-  const completedToday = myIssues.filter((i) => i.status === 'done' && isToday(i.updated_at)).length
-
-  const mySprintIssues = myIssues.filter((i) => activeSprintIds.has(i.sprint_id))
-  const sprintDone = mySprintIssues.filter((i) => i.status === 'done').length
-  const sprintProgress = mySprintIssues.length ? Math.round((sprintDone / mySprintIssues.length) * 100) : null
-
-  const loggedMinutesToday = myResultsToday.reduce((sum, r) => sum + (r.elapsed_minutes || 0), 0)
-
-  const timestamps = [...myIssues.map((i) => i.updated_at), ...myResults.map((r) => r.executed_at)]
-    .map(toDate)
-    .filter(Boolean)
-  const lastActivity = timestamps.length ? new Date(Math.max(...timestamps.map((d) => d.getTime()))) : null
-
-  let status = 'offline'
-  if (lastActivity) {
-    const minsAgo = (Date.now() - lastActivity.getTime()) / 60000
-    if (minsAgo < 15) status = 'working'
-    else if (minsAgo < 120) status = 'idle'
-  }
-
-  const taskCompletionPct = total > 0 ? Math.round((completed / total) * 100) : 0
-  const passRate = myResults.length ? myResults.filter((r) => r.status === 'passed').length / myResults.length : null
-  const onTimeRate = completed > 0
-    ? myIssues.filter((i) => i.status === 'done' && (!i.due_date || new Date(i.updated_at) <= new Date(i.due_date))).length / completed
-    : null
-  const ratingComponents = [taskCompletionPct / 100, passRate, onTimeRate].filter((v) => v !== null)
-  const avgScore = ratingComponents.length ? ratingComponents.reduce((a, b) => a + b, 0) / ratingComponents.length : 0
-  // Performance Score: the same blended completion/pass-rate/on-time formula
-  // as the old star rating, just shown 0-100 rather than 1-5 stars.
-  const performanceScore = Math.round(avgScore * 100)
-  // Quality Score: pass rate alone — a distinct, narrower signal than the
-  // blended Performance Score above, not a re-derivation of it.
-  const qualityScore = passRate !== null ? Math.round(passRate * 100) : null
-  const rating = Math.max(1, Math.min(5, Math.round(1 + avgScore * 4)))
-
-  const projectBadges = mems.map((m) => ({ key: m.projects?.key, name: m.projects?.name, projectId: m.project_id }))
-
-  return {
-    id: profile.id,
-    name: profile.name,
-    email: profile.email,
-    role,
-    projectBadges,
-    activeProjects: new Set(mems.map((m) => m.project_id)).size,
-    total, completed, remaining, overdue, completedToday,
-    testsExecuted: myResults.length,
-    testsPassedToday: myResultsToday.filter((r) => r.status === 'passed').length,
-    testsFailedToday: myResultsToday.filter((r) => r.status === 'failed').length,
-    testsBlockedToday: myResultsToday.filter((r) => r.status === 'blocked').length,
-    testsExecutedToday: myResultsToday.length,
-    bugsReported: myBugsReported.length,
-    bugsFixed: myBugsFixed.length,
-    bugsReportedToday: myBugsReported.filter((i) => isToday(i.created_at)).length,
-    bugsFixedToday: myBugsFixed.filter((i) => isToday(i.updated_at)).length,
-    loggedMinutesToday,
-    taskCompletionPct,
-    sprintProgress,
-    lastActivity,
-    status,
-    rating,
-    performanceScore,
-    qualityScore,
-    myIssues,
+// "Today" has to mean the viewer's day, so the browser's zone is sent with
+// every request rather than assuming the database server's.
+export function browserTimeZone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  } catch {
+    return 'UTC'
   }
 }
 
-// Real merged activity timeline (audit-trail status changes + bug reports +
-// test executions) for one member — shared by the list page's side panel
-// and the profile page so both render identical history.
-export function buildMemberTimeline(memberId, { issues, results }, activityRows) {
-  const issueTitle = (id) => issues.find((i) => i.id === id)?.title || 'a task'
+// GitHub-style calendar grid: fills whole weeks (Sunday first) from per-day
+// counts so ActivityHeatmap can flow them into columns.
+export function buildHeatmapDays(activityByDay, numDays = 98) {
+  const counts = Object.fromEntries((activityByDay || []).map((d) => [d.date, d.count]))
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const start = new Date(today)
+  start.setDate(start.getDate() - (numDays - 1))
+  start.setDate(start.getDate() - start.getDay())
+  const end = new Date(today)
+  end.setDate(end.getDate() + (6 - end.getDay()))
 
-  const taskEvents = (activityRows || [])
-    .filter((a) => a.action_type === 'status_changed' && (a.new_value === 'in_progress' || a.new_value === 'done'))
-    .map((a) => ({
-      id: `act-${a.id}`,
-      type: a.new_value === 'in_progress' ? 'Task Started' : 'Task Completed',
-      label: issueTitle(a.issue_id),
-      at: a.created_at,
-    }))
-
-  const bugEvents = issues
-    .filter((i) => i.type === 'bug' && i.reporter_id === memberId)
-    .map((i) => ({ id: `bug-${i.id}`, type: 'Bug Created', label: i.title, at: i.created_at }))
-
-  const testEvents = results
-    .filter((r) => r.executed_by === memberId)
-    .map((r) => ({ id: `res-${r.id}`, type: 'Test Case Executed', label: r.status, at: r.executed_at }))
-
-  return [...taskEvents, ...bugEvents, ...testEvents]
-    .filter((e) => e.at)
-    .sort((a, b) => (toDate(b.at)?.getTime() || 0) - (toDate(a.at)?.getTime() || 0))
-    .slice(0, 25)
+  const days = []
+  const cursor = new Date(start)
+  while (cursor <= end) {
+    const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`
+    days.push({ date: key, count: counts[key] || 0 })
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return days
 }
