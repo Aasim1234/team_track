@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
 import { fadeIn, scaleIn, TRANSITION } from '../../lib/motion'
@@ -5,7 +6,9 @@ import { fadeIn, scaleIn, TRANSITION } from '../../lib/motion'
 const SIZES = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-xl', xl: 'max-w-3xl' }
 
 export default function Modal({ open, onClose, title, children, footer, size = 'md' }) {
-  return (
+  // Rendered into <body>, never inside the page: a dialog's own DOM position
+  // must not influence the scroll position of whatever opened it.
+  const dialog = (
     <AnimatePresence>
       {open && (
         <motion.div
@@ -45,4 +48,6 @@ export default function Modal({ open, onClose, title, children, footer, size = '
       )}
     </AnimatePresence>
   )
+
+  return typeof document === 'undefined' ? dialog : createPortal(dialog, document.body)
 }

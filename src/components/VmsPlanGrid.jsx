@@ -121,6 +121,18 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
   // Opened from a link to one test case (e.g. Recently added test cases):
   // bring that row into view and highlight it briefly.
   const [flashId, setFlashId] = useState(null)
+
+  // Failing or blocking a test case must leave you on that test case, ready to
+  // run it again — never somewhere else in the plan.
+  const keepRowInView = (rowId) => {
+    const el = document.getElementById(`case-${rowId}`)
+    if (!el) return
+    const box = el.getBoundingClientRect()
+    const hidden = box.top < 64 || box.bottom > window.innerHeight - 24
+    if (hidden) el.scrollIntoView({ block: 'center' })
+    setFlashId(rowId)
+    setTimeout(() => setFlashId((current) => (current === rowId ? null : current)), 2500)
+  }
   useEffect(() => {
     if (loading || !focusRowId) return
     const show = setTimeout(() => {
@@ -132,8 +144,13 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
   }, [loading, focusRowId])
 
   // Pick up test cases other people took while this tab was in the background.
+  // A refresh while a dialog is open would swap the rows underneath it, so it
+  // waits until the dialog is closed.
+  const busyRef = useRef(false)
+  busyRef.current = Boolean(editingId || reasonFor || deleteFor || bulkOpen)
+
   useEffect(() => {
-    const onFocus = () => { if (!editingRef.current) fetchRows() }
+    const onFocus = () => { if (!busyRef.current) fetchRows() }
     window.addEventListener('focus', onFocus)
     return () => window.removeEventListener('focus', onFocus)
   }, [planId])
@@ -241,6 +258,7 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
       return false
     }
     applyRow(row.id, data)
+    keepRowInView(row.id)
     return true
   }
 
@@ -756,7 +774,7 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
 
       <FailCommentModal
         open={Boolean(reasonFor)}
-        onClose={() => setReasonFor(null)}
+        onClose={() => { const id = reasonFor?.row?.id; setReasonFor(null); if (id) keepRowInView(id) }}
         row={reasonFor?.row}
         existing={reasonFor?.existing}
         status={reasonStatusRef.current}
