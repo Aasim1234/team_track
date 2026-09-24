@@ -593,6 +593,7 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
             </div>
             <VmsPlanGrid
               planId={planId}
+              planName={plan.name}
               projectId={projectId}
               userId={userId}
               members={members}

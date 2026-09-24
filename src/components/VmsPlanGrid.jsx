@@ -1,11 +1,13 @@
 import { Fragment, useState, useMemo, useRef, useEffect } from 'react'
-import { Plus, Search, X, MessageSquareWarning, Pencil, Check, Lock, UserPlus, UserCheck, Trash2 } from 'lucide-react'
+import { Plus, Search, X, MessageSquareWarning, Pencil, Check, Lock, UserPlus, UserCheck, Trash2, Upload, Download } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { useToast } from './ui/Toast'
 import { VMS_RESULT } from '../lib/statusConfig'
 import FailCommentModal from './FailCommentModal'
 import BulkAssignModal from './BulkAssignModal'
 import DeleteTestCaseModal from './DeleteTestCaseModal'
+import ImportTestCasesModal from './ImportTestCasesModal'
+import { downloadImportTemplate } from '../lib/testCaseImport'
 import { formatCaseId } from '../lib/testCaseId'
 import { usePermissions } from '../hooks/usePermissions'
 
@@ -59,7 +61,7 @@ function AutoTextarea({ value, onChange, onKeyDown, autoFocus, className }) {
   )
 }
 
-export default function VmsPlanGrid({ planId, projectId, userId, members = [], focusRowId }) {
+export default function VmsPlanGrid({ planId, planName = 'this test plan', projectId, userId, members = [], focusRowId }) {
   const toast = useToast()
   // What this user may do comes from their role; the database enforces the same rules.
   const { can } = usePermissions()
@@ -80,6 +82,7 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
   const [selected, setSelected] = useState(() => new Set())
   const [bulkOpen, setBulkOpen] = useState(false)
   // Delete Test Case (from a row's edit mode): the test case awaiting confirmation.
+  const [showImport, setShowImport] = useState(false)
   const [deleteFor, setDeleteFor] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const lastDeleteRef = useRef(null)
@@ -147,7 +150,7 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
   // A refresh while a dialog is open would swap the rows underneath it, so it
   // waits until the dialog is closed.
   const busyRef = useRef(false)
-  busyRef.current = Boolean(editingId || reasonFor || deleteFor || bulkOpen)
+  busyRef.current = Boolean(editingId || reasonFor || deleteFor || bulkOpen || showImport)
 
   useEffect(() => {
     const onFocus = () => { if (!busyRef.current) fetchRows() }
@@ -557,12 +560,27 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
         </select>
 
         {canCreate && (
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => setShowImport(true)}
+              className="flex items-center gap-1.5 border border-gray-600 hover:border-gray-500 text-gray-300 hover:text-white px-2.5 py-1.5 rounded-md text-[12px] font-semibold"
+            >
+              <Upload size={13} /> Import Test Cases
+            </button>
+            <button
+              onClick={downloadImportTemplate}
+              title="Excel template with the five columns and example rows"
+              className="flex items-center gap-1.5 border border-gray-600 hover:border-gray-500 text-gray-300 hover:text-white px-2.5 py-1.5 rounded-md text-[12px] font-semibold"
+            >
+              <Download size={13} /> Download Template
+            </button>
           <button
             onClick={addRow}
-            className="ml-auto flex items-center gap-1.5 bg-blue-500 hover:bg-blue-400 text-white px-2.5 py-1.5 rounded-md text-[12px] font-semibold"
+            className="flex items-center gap-1.5 bg-blue-500 hover:bg-blue-400 text-white px-2.5 py-1.5 rounded-md text-[12px] font-semibold"
           >
             <Plus size={13} /> Add Row
           </button>
+          </div>
         )}
       </div>
 
@@ -780,6 +798,17 @@ export default function VmsPlanGrid({ planId, projectId, userId, members = [], f
         status={reasonStatusRef.current}
         onConfirm={confirmReason}
       />
+
+      {canCreate && (
+        <ImportTestCasesModal
+          open={showImport}
+          onClose={() => setShowImport(false)}
+          planId={planId}
+          planName={planName}
+          existingRows={rows}
+          onImported={() => { setShowImport(false); fetchRows() }}
+        />
+      )}
 
       {canDelete && (
         <DeleteTestCaseModal
