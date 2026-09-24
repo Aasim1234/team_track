@@ -2,12 +2,11 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  FolderKanban, ListChecks, PlayCircle, TrendingUp,
+  FolderKanban, ListChecks, ClipboardList, TrendingUp,
   ArrowUpRight, User, Activity as ActivityIcon, Star, Sparkles,
-  CalendarClock, UserPlus, RefreshCw, MessageSquare, Bell, Rocket,
+  CalendarClock, UserPlus, RefreshCw, MessageSquare, Bell,
 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
-import { fetchAllRows } from '../lib/fetchAllRows'
 import { useAuth } from '../hooks/useAuth'
 import { useNotifications } from '../hooks/useNotifications'
 import ProjectSidebar from '../components/ProjectSidebar'
@@ -21,16 +20,35 @@ import ProgressRing from '../components/ui/ProgressRing'
 import StatCard from '../components/ui/StatCard'
 import BentoCard from '../components/ui/BentoCard'
 import EmptyState from '../components/ui/EmptyState'
-import { summarizeCases, formatPercent } from '../lib/testMetrics'
+import StatusBadge from '../components/ui/StatusBadge'
+import { formatPercent } from '../lib/testMetrics'
 import { AUDIT_ACTIONS } from '../lib/auditLog'
 import { usePermissions } from '../hooks/usePermissions'
-import { Donut, Swatch, CASE_SERIES, fmt, pctLabel } from '../components/charts/CoverageCharts'
+import { browserTimeZone } from '../lib/performanceScore'
+import { TEST_PLAN_STATUS, VMS_RESULT } from '../lib/statusConfig'
+import { formatCaseId } from '../lib/testCaseId'
+import { Donut, Swatch, VMS_SERIES, fmt, pctLabel } from '../components/charts/CoverageCharts'
 import { fadeInUp, staggerContainer, TRANSITION } from '../lib/motion'
 
 const NOTIFICATION_ICON = {
   assigned: UserPlus,
   status_changed: RefreshCw,
   comment: MessageSquare,
+}
+
+// Everything on this page comes from dashboard_summary(), which reads the test
+// plans, test cases, To-Do tasks and activity log the team actually works in.
+const EMPTY_SUMMARY = {
+  totals: {
+    projects: 0, testCases: 0, testPlans: 0, plansUnderTesting: 0,
+    executed: 0, passRate: 0, progress: 0, assignedToMe: 0, resultsToday: 0,
+  },
+  coverage: { pass: 0, fail: 0, blocked: 0, retest: 0, na: 0, not_tested: 0 },
+  trend: [],
+  plans: [],
+  projects: [],
+  myTasks: [],
+  due: [],
 }
 
 function toDate(dateStr) {
@@ -40,18 +58,13 @@ function toDate(dateStr) {
   return Number.isNaN(d.getTime()) ? null : d
 }
 
-function dayKey(d) {
-  return d.toISOString().slice(0, 10)
-}
-
-function last14Days() {
-  const days = []
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
-    days.push(d)
-  }
-  return days
+// A target date is a calendar day, not an instant — read it in local time so it
+// never slips a day either side of midnight.
+function toDay(dateStr) {
+  if (!dateStr) return null
+  const [y, m, d] = String(dateStr).slice(0, 10).split('-').map(Number)
+  if (!y || !m || !d) return null
+  return new Date(y, m - 1, d)
 }
 
 function timeAgo(dateStr) {
@@ -67,9 +80,17 @@ function timeAgo(dateStr) {
 }
 
 function formatDueDate(dateStr) {
-  const d = toDate(dateStr)
+  const d = toDay(dateStr)
   if (!d) return ''
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+function isOverdue(dateStr) {
+  const d = toDay(dateStr)
+  if (!d) return false
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return d < today
 }
 
 export default function Dashboard() {
@@ -79,14 +100,8 @@ export default function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { notifications } = useNotifications()
 
-  const [projects, setProjects] = useState([])
-  const [issues, setIssues] = useState([])
-  const [testCases, setTestCases] = useState([])
-  const [testRuns, setTestRuns] = useState([])
-  const [statusRows, setStatusRows] = useState([])
-  const [testResults, setTestResults] = useState([])
+  const [summary, setSummary] = useState(EMPTY_SUMMARY)
   const [activity, setActivity] = useState([])
-  const [sprints, setSprints] = useState([])
   const [starredIds, setStarredIds] = useState(new Set())
   const [loading, setLoading] = useState(true)
 
@@ -106,41 +121,32 @@ export default function Dashboard() {
   const fetchAll = async () => {
     setLoading(true)
     const [
-      { data: projectRows },
-      { data: issueRows },
-      { data: caseRows },
-      { data: runRows },
-      { data: statusData },
-      { data: resultRows },
+      { data: summaryData, error: summaryError },
       { data: activityRows },
-      { data: sprintRows },
-      { data: starredRows },
     ] = await Promise.all([
-      supabase.from('projects').select('*').order('created_at', { ascending: false }),
-      supabase.from('issues').select('id, project_id, title, type, status, priority, assignee_id, due_date, created_at, sprint_id'),
-      fetchAllRows(() => supabase.from('test_cases').select('id, project_id').order('id')),
-      supabase.from('test_runs').select('id, project_id, status'),
-      fetchAllRows(() => supabase.from('test_run_case_current_status').select('run_case_id, test_case_id, current_status, last_executed_at').order('run_case_id')),
-      fetchAllRows(() => supabase.from('test_results').select('id, executed_at').order('id')),
+      supabase.rpc('dashboard_summary', { p_timezone: browserTimeZone() }),
       supabase.from('audit_log').select('id, project_id, actor_name, action, entity_label, occurred_at').order('occurred_at', { ascending: false }).order('id', { ascending: false }).limit(8),
-      supabase.from('sprints').select('id, project_id, name, status').eq('status', 'active'),
-      user ? supabase.from('starred_projects').select('project_id').eq('user_id', user.id) : Promise.resolve({ data: [] }),
     ])
-    setProjects(projectRows || [])
-    setIssues(issueRows || [])
-    setTestCases(caseRows || [])
-    setTestRuns(runRows || [])
-    setStatusRows(statusData || [])
-    setTestResults(resultRows || [])
+    if (summaryError) toast.error(summaryError.message)
+    setSummary(summaryData ? { ...EMPTY_SUMMARY, ...summaryData } : EMPTY_SUMMARY)
     setActivity(activityRows || [])
-    setSprints(sprintRows || [])
-    setStarredIds(new Set((starredRows || []).map((r) => r.project_id)))
     setLoading(false)
   }
 
   useEffect(() => {
     fetchAll()
   }, [])
+
+  // Stars are per user, so this waits for the session rather than riding along
+  // with the first load, which happens before useAuth has resolved it.
+  useEffect(() => {
+    if (!user) { setStarredIds(new Set()); return }
+    let cancelled = false
+    supabase.from('starred_projects').select('project_id').eq('user_id', user.id).then(({ data }) => {
+      if (!cancelled) setStarredIds(new Set((data || []).map((r) => r.project_id)))
+    })
+    return () => { cancelled = true }
+  }, [user?.id])
 
   const handleCreate = async (e) => {
     e.preventDefault()
@@ -159,50 +165,17 @@ export default function Dashboard() {
     }
   }
 
-  // Test metrics come from the shared module, so this page, Test Coverage and
-  // Reports always agree on what "test cases" and "pass rate" mean.
-  const caseSummary = useMemo(() => summarizeCases(testCases, statusRows), [testCases, statusRows])
-  const activeRuns = testRuns.filter((r) => r.status === 'active').length
+  const { totals, coverage, plans, projects, myTasks, due } = summary
 
-  const executionTrend = useMemo(() => {
-    const days = last14Days()
-    return days.map((d) => ({
-      label: d.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' }),
-      value: testResults.filter((r) => { const rd = toDate(r.executed_at); return rd && dayKey(rd) === dayKey(d) }).length,
-    }))
-  }, [testResults])
-
-
-  const sprintStatus = useMemo(() => {
-    return sprints.map((s) => {
-      const sprintIssues = issues.filter((i) => i.sprint_id === s.id)
-      const done = sprintIssues.filter((i) => i.status === 'done').length
-      const total = sprintIssues.length
-      const project = projects.find((p) => p.id === s.project_id)
-      return {
-        id: s.id,
-        name: s.name,
-        projectId: s.project_id,
-        projectName: project?.name || 'Unknown project',
-        done,
-        total,
-        pct: total > 0 ? Math.round((done / total) * 100) : 0,
-      }
-    })
-  }, [sprints, issues, projects])
+  const executionTrend = useMemo(
+    () => (summary.trend || []).map((d) => ({
+      label: toDay(d.date)?.toLocaleDateString(undefined, { month: 'numeric', day: 'numeric' }) || '',
+      value: d.value || 0,
+    })),
+    [summary.trend],
+  )
 
   const starredProjects = projects.filter((p) => starredIds.has(p.id))
-
-  const upcomingDueDates = issues
-    .filter((i) => i.due_date && i.status !== 'done')
-    .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
-    .slice(0, 6)
-
-  const assignedToMe = issues
-    .filter((i) => i.assignee_id === user?.id && i.status !== 'done')
-    .sort((a, b) => (a.due_date ? new Date(a.due_date) : Infinity) - (b.due_date ? new Date(b.due_date) : Infinity))
-    .slice(0, 5)
-
   const recentNotifications = notifications.slice(0, 5)
 
   if (loading) {
@@ -247,118 +220,117 @@ export default function Dashboard() {
             animate="animate"
             className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4"
           >
-            <StatCard icon={FolderKanban} label="Projects" value={projects.length} tint="bg-blue-50 text-blue-600" />
-            <StatCard icon={ListChecks} label="Test Cases" value={testCases.length} tint="bg-gray-100 text-gray-600" />
-            <StatCard icon={PlayCircle} label="Active Test Runs" value={activeRuns} tint="bg-blue-50 text-blue-600" />
-            <StatCard icon={TrendingUp} label="Pass Rate" value={formatPercent(caseSummary.passRate)} tint="bg-green-50 text-green-600" />
+            <StatCard icon={FolderKanban} label="Projects" value={totals.projects} tint="bg-blue-50 text-blue-600" />
+            <StatCard icon={ListChecks} label="Test Cases" value={totals.testCases} tint="bg-gray-100 text-gray-600" />
+            <StatCard icon={ClipboardList} label="Test Plans" value={totals.testPlans} tint="bg-blue-50 text-blue-600" />
+            <StatCard icon={TrendingUp} label="Pass Rate" value={formatPercent(totals.passRate)} tint="bg-green-50 text-green-600" />
           </motion.div>
 
           {/* Row 1 — Execution Trend / Testing Coverage */}
           <div className="grid grid-cols-12 gap-4 mb-4">
-            <BentoCard className="col-span-12 md:col-span-4 p-4">
+            <BentoCard noHover className="col-span-12 md:col-span-4 p-4">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-[13px] font-semibold text-white">Execution Trend</p>
-                <span className="text-[11px] text-gray-500">14 days · {activeRuns} active</span>
+                <span className="text-[11px] text-gray-500">14 days · {totals.resultsToday} today</span>
               </div>
               <TrendChart data={executionTrend} color="blue" />
+              <p className="text-[11px] text-gray-500 mt-2">Test case results recorded per day</p>
             </BentoCard>
 
-            <BentoCard
-              role="link"
-              tabIndex={0}
-              title="Open the full test coverage report"
-              onClick={() => navigate('/coverage')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/coverage') }
-              }}
-              className="col-span-12 md:col-span-8 p-5 cursor-pointer group outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
-            >
+            <BentoCard noHover className="col-span-12 md:col-span-8 p-5">
               <div className="flex items-center justify-between mb-4">
                 <p className="text-[14px] font-semibold text-white">Testing Coverage</p>
-                <span className="flex items-center gap-1 text-[11px] text-gray-500 group-hover:text-blue-400">
-                  {fmt(caseSummary.total)} test cases · View details <ArrowUpRight size={12} />
+                <span className="text-[11px] text-gray-500">
+                  {fmt(totals.executed)} of {fmt(totals.testCases)} executed
                 </span>
               </div>
-              {caseSummary.total === 0 ? (
+              {totals.testCases === 0 ? (
                 <p className="text-[12px] text-gray-500">No test cases yet.</p>
               ) : (
-                <div className="flex items-center gap-10">
+                <div className="flex flex-wrap items-center gap-10">
                   <Donut
-                    series={CASE_SERIES}
-                    counts={caseSummary.counts}
+                    series={VMS_SERIES}
+                    counts={coverage}
                     size={188}
                     thickness={20}
-                    centerValue={formatPercent(caseSummary.passRate)}
+                    centerValue={formatPercent(totals.passRate)}
                     centerLabel="pass rate"
                   />
                   <div className="flex-1 min-w-0 max-w-md space-y-2.5">
-                    {CASE_SERIES.filter((s) => caseSummary.counts[s.key] > 0).map((s) => (
+                    {VMS_SERIES.filter((s) => coverage[s.key] > 0).map((s) => (
                       <div key={s.key} className="flex items-center gap-2.5 text-[13px]">
                         <Swatch series={s} round />
                         <span className="text-gray-300 flex-1 truncate">{s.label}</span>
-                        <span className="text-white font-semibold tabular-nums">{fmt(caseSummary.counts[s.key])}</span>
-                        <span className="text-gray-500 tabular-nums w-12 text-right">{pctLabel(caseSummary.counts[s.key], caseSummary.total)}</span>
+                        <span className="text-white font-semibold tabular-nums">{fmt(coverage[s.key])}</span>
+                        <span className="text-gray-500 tabular-nums w-12 text-right">{pctLabel(coverage[s.key], totals.testCases)}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
               <p className="text-[12px] text-gray-400 mt-4 pt-3 border-t border-gray-750">
-                Each test case counted once, at its latest result
+                Every test case in your test plans, at its current result · pass rate is passed ÷ executed
               </p>
             </BentoCard>
           </div>
 
-          {/* Row 2 — Sprint Status / Starred Projects / Notifications */}
+          {/* Row 2 — Test Plans / Starred Projects / Notifications */}
           <div className="grid grid-cols-12 gap-4 mb-4">
-            <BentoCard className="col-span-12 md:col-span-4 p-4">
-              <p className="text-[13px] font-semibold text-white mb-3 flex items-center gap-1.5"><Rocket size={14} /> Sprint Status</p>
+            <BentoCard noHover className="col-span-12 md:col-span-4 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[13px] font-semibold text-white flex items-center gap-1.5"><ClipboardList size={14} /> Test Plans</p>
+                {totals.plansUnderTesting > 0 && (
+                  <span className="text-[11px] text-gray-500">{totals.plansUnderTesting} under testing</span>
+                )}
+              </div>
               <div className="space-y-3">
-                {sprintStatus.map((s) => (
-                  <div key={s.id}>
-                    <div className="flex items-center justify-between text-[12px] mb-1">
-                      <span className="text-gray-300 truncate">{s.projectName} · {s.name}</span>
-                      <span className="text-gray-500">{s.done}/{s.total}</span>
+                {plans.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => navigate(`/project/${p.projectId}/plans/${p.id}`)}
+                    className="w-full text-left rounded-md px-1 -mx-1 py-1 hover:bg-gray-650"
+                  >
+                    <div className="flex items-center justify-between gap-2 text-[12px] mb-1">
+                      <span className="text-gray-300 truncate">{p.name}</span>
+                      <span className="text-gray-500 flex-shrink-0 tabular-nums">{fmt(p.executed)}/{fmt(p.total)}</span>
                     </div>
                     <div className="w-full bg-gray-750 rounded-full h-1.5">
                       <motion.div
                         className="bg-blue-500 h-1.5 rounded-full"
                         initial={{ width: 0 }}
-                        animate={{ width: `${s.pct}%` }}
+                        animate={{ width: `${p.progress}%` }}
                         transition={{ duration: 0.5, ease: 'easeOut' }}
                       />
                     </div>
-                  </div>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <StatusBadge domain={TEST_PLAN_STATUS} value={p.status} size="sm" />
+                      {p.release && <span className="text-[11px] text-gray-500 truncate">Release {p.release}</span>}
+                    </div>
+                  </button>
                 ))}
-                {sprintStatus.length === 0 && <p className="text-[12px] text-gray-500">No active sprints.</p>}
+                {plans.length === 0 && <p className="text-[12px] text-gray-500">No test plans yet.</p>}
               </div>
             </BentoCard>
 
-            <BentoCard className="col-span-12 md:col-span-4 p-4">
+            <BentoCard noHover className="col-span-12 md:col-span-4 p-4">
               <p className="text-[13px] font-semibold text-white mb-3 flex items-center gap-1.5"><Star size={14} /> Starred Projects</p>
               <div className="space-y-2">
-                {starredProjects.map((p) => {
-                  const projectIssues = issues.filter((i) => i.project_id === p.id)
-                  const total = projectIssues.length
-                  const done = projectIssues.filter((i) => i.status === 'done').length
-                  const percent = total > 0 ? Math.round((done / total) * 100) : 0
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => navigate(`/project/${p.id}`)}
-                      className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-gray-650 text-left"
-                    >
-                      <ProgressRing percent={percent} size={28} />
-                      <span className="text-[12px] text-gray-300 truncate flex-1">{p.name}</span>
-                      <span className="text-[11px] text-gray-500 flex-shrink-0">{percent}%</span>
-                    </button>
-                  )
-                })}
+                {starredProjects.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => navigate(`/project/${p.id}`)}
+                    className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-gray-650 text-left"
+                  >
+                    <ProgressRing percent={p.progress} size={28} />
+                    <span className="text-[12px] text-gray-300 truncate flex-1">{p.name}</span>
+                    <span className="text-[11px] text-gray-500 flex-shrink-0">{p.progress}%</span>
+                  </button>
+                ))}
                 {starredProjects.length === 0 && <p className="text-[12px] text-gray-500">Star a project from the sidebar to pin it here.</p>}
               </div>
             </BentoCard>
 
-            <BentoCard className="col-span-12 md:col-span-4 p-4">
+            <BentoCard noHover className="col-span-12 md:col-span-4 p-4">
               <p className="text-[13px] font-semibold text-white mb-3 flex items-center gap-1.5"><Bell size={14} /> Notifications</p>
               <div className="space-y-2">
                 {recentNotifications.map((n) => {
@@ -380,35 +352,65 @@ export default function Dashboard() {
 
           {/* Row 3 — Assigned to Me / Upcoming Due Dates / Recent Activity */}
           <div className="grid grid-cols-12 gap-4 mb-4">
-            <BentoCard className="col-span-12 md:col-span-4 p-4">
-              <p className="text-[13px] font-semibold text-white mb-3 flex items-center gap-1.5"><User size={14} /> Assigned to Me</p>
+            <BentoCard noHover className="col-span-12 md:col-span-4 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-[13px] font-semibold text-white flex items-center gap-1.5"><User size={14} /> Assigned to Me</p>
+                {totals.assignedToMe > 0 && (
+                  <span className="text-[11px] text-gray-500">{totals.assignedToMe} open</span>
+                )}
+              </div>
               <div className="space-y-1">
-                {assignedToMe.map((i) => (
-                  <p key={i.id} className="px-2 py-1.5 text-[12px] truncate">{i.title}</p>
+                {myTasks.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => navigate(`/project/${t.projectId}/plans/${t.planId}?case=${t.id}`)}
+                    className="w-full text-left px-2 py-1.5 rounded-md hover:bg-gray-650"
+                  >
+                    <p className="text-[12px] truncate">
+                      <span className="text-gray-500 tabular-nums">{formatCaseId(t.caseNumber)}</span>{' '}
+                      {t.scenario || t.topic}
+                    </p>
+                    <p className="text-[11px] text-gray-500 truncate">
+                      {t.planName}
+                      {t.result && t.result !== 'not_tested' && ` · ${VMS_RESULT[t.result]?.label || t.result}`}
+                    </p>
+                  </button>
                 ))}
-                {assignedToMe.length === 0 && <p className="text-[12px] text-gray-500 px-2 py-1">Nothing assigned to you.</p>}
+                {myTasks.length === 0 && <p className="text-[12px] text-gray-500 px-2 py-1">Nothing assigned to you.</p>}
+                {totals.assignedToMe > myTasks.length && (
+                  <button
+                    onClick={() => navigate(`/project/${myTasks[0].projectId}/todo`)}
+                    className="text-[11px] text-gray-500 hover:text-blue-400 px-2 pt-1"
+                  >
+                    +{totals.assignedToMe - myTasks.length} more in To-Do
+                  </button>
+                )}
               </div>
             </BentoCard>
 
-            <BentoCard className="col-span-12 md:col-span-4 p-4">
+            <BentoCard noHover className="col-span-12 md:col-span-4 p-4">
               <p className="text-[13px] font-semibold text-white mb-3 flex items-center gap-1.5"><CalendarClock size={14} /> Upcoming Due Dates</p>
               <div className="space-y-1">
-                {upcomingDueDates.map((i) => {
-                  const overdue = new Date(i.due_date) < new Date()
-                  return (
-                    <div key={i.id} className="flex items-center justify-between gap-2 px-2 py-1.5">
-                      <span className="text-[12px] truncate">{i.title}</span>
-                      <span className={`text-[11px] flex-shrink-0 ${overdue ? 'text-red-500' : 'text-gray-500'}`}>
-                        {formatDueDate(i.due_date)}
-                      </span>
-                    </div>
-                  )
-                })}
-                {upcomingDueDates.length === 0 && <p className="text-[12px] text-gray-500 px-2 py-1">Nothing due.</p>}
+                {due.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => navigate(`/project/${p.projectId}/plans/${p.id}`)}
+                    className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-gray-650 text-left"
+                  >
+                    <span className="text-[12px] truncate">
+                      {p.name}
+                      {p.release && <span className="text-gray-500"> · {p.release}</span>}
+                    </span>
+                    <span className={`text-[11px] flex-shrink-0 ${isOverdue(p.targetDate) ? 'text-red-500' : 'text-gray-500'}`}>
+                      {formatDueDate(p.targetDate)}
+                    </span>
+                  </button>
+                ))}
+                {due.length === 0 && <p className="text-[12px] text-gray-500 px-2 py-1">No test plan has a target date.</p>}
               </div>
             </BentoCard>
 
-            <BentoCard className="col-span-12 md:col-span-4 p-4">
+            <BentoCard noHover className="col-span-12 md:col-span-4 p-4">
               <p className="text-[13px] font-semibold text-white mb-3 flex items-center gap-1.5"><ActivityIcon size={14} /> Recent Activity</p>
               <div className="space-y-2">
                 {activity.map((a) => (
@@ -467,47 +469,40 @@ export default function Dashboard() {
               animate="animate"
               className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3"
             >
-              {projects.map((p) => {
-                const projectIssues = issues.filter((i) => i.project_id === p.id)
-                const total = projectIssues.length
-                const done = projectIssues.filter((i) => i.status === 'done').length
-                const percent = total > 0 ? Math.round((done / total) * 100) : 0
-
-                return (
-                  <BentoCard
-                    key={p.id}
-                    as={motion.div}
-                    variants={fadeInUp}
-                    transition={TRANSITION}
-                    whileHover={{ scale: 1.02, y: -2 }}
-                    onClick={() => navigate(`/project/${p.id}`)}
-                    className="group hover:bg-gray-650 p-4 cursor-pointer"
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <span className="text-[11px] font-bold bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md tracking-wide">
-                        {p.key}
-                      </span>
-                      <ArrowUpRight size={15} className="text-gray-500 group-hover:text-blue-500" />
-                    </div>
-                    <h3 className="text-[14px] font-semibold mb-0.5">{p.name}</h3>
-                    <p className="text-[12px] text-gray-500 mb-3 truncate">
-                      {p.description || `${total} issue${total === 1 ? '' : 's'} tracked`}
-                    </p>
-                    <div className="flex items-center gap-3">
-                      <ProgressRing percent={percent} label={`${percent}%`} />
-                      <div className="flex-1">
-                        <p className="text-[11px] text-gray-400">
-                          <span className="text-white font-semibold">{done}</span>
-                          <span className="text-gray-500"> / {total} done</span>
-                        </p>
-                        <div className="w-full bg-gray-600 rounded-full h-1.5 mt-1.5">
-                          <div className="bg-green-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${percent}%` }} />
-                        </div>
+              {projects.map((p) => (
+                <BentoCard
+                  key={p.id}
+                  as={motion.div}
+                  variants={fadeInUp}
+                  transition={TRANSITION}
+                  whileHover={{ scale: 1.02, y: -2 }}
+                  onClick={() => navigate(`/project/${p.id}`)}
+                  className="group hover:bg-gray-650 p-4 cursor-pointer"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <span className="text-[11px] font-bold bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-md tracking-wide">
+                      {p.key}
+                    </span>
+                    <ArrowUpRight size={15} className="text-gray-500 group-hover:text-blue-500" />
+                  </div>
+                  <h3 className="text-[14px] font-semibold mb-0.5">{p.name}</h3>
+                  <p className="text-[12px] text-gray-500 mb-3 truncate">
+                    {p.description || `${p.plans} test plan${p.plans === 1 ? '' : 's'} · ${fmt(p.testCases)} test case${p.testCases === 1 ? '' : 's'}`}
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <ProgressRing percent={p.progress} label={`${p.progress}%`} />
+                    <div className="flex-1">
+                      <p className="text-[11px] text-gray-400">
+                        <span className="text-white font-semibold">{fmt(p.executed)}</span>
+                        <span className="text-gray-500"> / {fmt(p.testCases)} executed</span>
+                      </p>
+                      <div className="w-full bg-gray-600 rounded-full h-1.5 mt-1.5">
+                        <div className="bg-green-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${p.progress}%` }} />
                       </div>
                     </div>
-                  </BentoCard>
-                )
-              })}
+                  </div>
+                </BentoCard>
+              ))}
             </motion.div>
           )}
         </div>

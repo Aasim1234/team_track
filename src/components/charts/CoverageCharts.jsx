@@ -23,6 +23,17 @@ export const CASE_SERIES = [
   { key: NOT_IN_RUN, label: 'Not in any run', color: 'var(--color-gray-750)', hollow: true },
 ]
 
+// For VMS test plans: the result a test case carries in its plan. Untested is
+// a real result here — a case nobody has run yet — so it keeps its own colour.
+export const VMS_SERIES = [
+  { key: 'pass', label: 'Passed', color: 'var(--viz-pass)' },
+  { key: 'fail', label: 'Failed', color: 'var(--viz-fail)' },
+  { key: 'blocked', label: 'Blocked', color: 'var(--viz-blocked)' },
+  { key: 'retest', label: 'Retest', color: 'var(--viz-retest)' },
+  { key: 'na', label: 'N/A', color: 'var(--viz-skipped)' },
+  { key: 'not_tested', label: 'Untested', color: 'var(--viz-untested)' },
+]
+
 export const fmt = (n) => (n ?? 0).toLocaleString()
 
 // Shares use the one app-wide percentage format from testMetrics.

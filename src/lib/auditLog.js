@@ -10,6 +10,7 @@ export const AUDIT_ACTIONS = {
   row_edited: { label: 'Edited test case' },
   row_added: { label: 'Added test case' },
   row_deleted: { label: 'Deleted test case' },
+  cases_imported: { label: 'Imported test cases' },
   assigned: { label: 'Assigned test case' },
   unassigned: { label: 'Unassigned test case' },
   reassigned: { label: 'Reassigned test case' },
