@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Tag, Pencil, Trash2, Check, X, Plus } from 'lucide-react'
+import { Tag, Pencil, Trash2, Check, X, Plus, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import Modal from './ui/Modal'
 import FormField, { inputClass } from './ui/FormField'
@@ -148,6 +148,16 @@ export function ChangeReleaseModal({ open, onClose, plan, projectId, releases, o
             <p className="text-[11px] text-gray-500">
               This plan is marked {plan.status === 'pass' ? 'Pass' : 'Discard'} for release {plan.release?.name}. That release report stays in Reports,
               and the plan starts as Active in the new release version.
+            </p>
+          ) : plan.release?.name ? (
+            // A report is only saved when a plan is marked Pass or Discard, so
+            // moving on without doing that leaves the old release with none.
+            <p className="flex items-start gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-[11px] text-gray-300">
+              <AlertTriangle size={12} className="text-amber-500 mt-0.5 flex-shrink-0" />
+              <span>
+                No release report will be kept for <span className="text-white font-medium">{plan.release.name}</span>: one is saved only when a test plan is
+                marked Pass or Discard. Set this plan's status first if you need a {plan.release.name} report — its results move on with the plan.
+              </span>
             </p>
           ) : (
             <p className="text-[11px] text-gray-500">The test plan list, To-Do and exports all show the release version saved here.</p>
