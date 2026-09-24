@@ -37,6 +37,8 @@ const RESULT_CLASS = {
   not_tested: 'bg-gray-700/40 text-gray-400 border-gray-600/40',
 }
 
+const BULK_DONE_WORD = { completed: 'completed', closed: 'closed', open: 'reopened' }
+
 const TASK_SAVED = { completed: 'Task completed — moved to Completed / Closed', closed: 'Task closed — moved to Completed / Closed', open: 'Task reopened' }
 
 function Detail({ label, children }) {
@@ -67,6 +69,8 @@ export default function TodoPage() {
   const [openId, setOpenId] = useState(null)
   const [busy, setBusy] = useState(false)
   const [reasonFor, setReasonFor] = useState(null)   // { status, existing } | null
+  const [selected, setSelected] = useState(() => new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
 
   // Kept after close so dialogs don't blank out while they animate away.
   const lastTaskRef = useRef(null)
@@ -112,6 +116,62 @@ export default function TodoPage() {
 
   const assignerName = (t) =>
     !t.assigned_by ? 'System' : t.assigned_by === user?.id ? 'You' : t.assigner?.name || 'Unknown user'
+
+  // Selection only ever covers the rows on screen: switching tab or searching
+  // drops anything that is no longer listed.
+  const visibleIds = visible.map((t) => t.id)
+  const selectedVisible = visibleIds.filter((id) => selected.has(id))
+  const allVisibleSelected = visibleIds.length > 0 && selectedVisible.length === visibleIds.length
+  const clearSelection = () => setSelected(new Set())
+
+  const toggleOne = (id) => setSelected((current) => {
+    const next = new Set(current)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    return next
+  })
+
+  const toggleAllVisible = () => setSelected(allVisibleSelected ? new Set() : new Set(visibleIds))
+
+  // One call for the whole selection: the database applies the same rules as a
+  // single task (your own tasks, a result recorded before completing) and tells
+  // us what it skipped.
+  const bulkSetStatus = async (status) => {
+    const ids = selectedVisible
+    if (!ids.length || bulkBusy) return
+    const untested = ids.filter((id) => {
+      const t = tasks.find((x) => x.id === id)
+      return !t?.result || t.result === 'not_tested'
+    }).length
+    if (status === 'completed' && untested === ids.length) {
+      toast.error(untested === 1
+        ? 'Record a result for this test case before completing the task.'
+        : 'None of the selected tasks has a result recorded yet.')
+      return
+    }
+    if (status === 'closed' && !confirm(
+      ids.length === 1
+        ? 'Close this task without completing it? The test case and its result stay as they are.'
+        : `Close ${ids.length} tasks without completing them? The test cases and their results stay as they are.`)) return
+    if (status === 'completed' && untested > 0 && !confirm(
+      `${untested} of the ${ids.length} selected tasks ${untested === 1 ? 'has' : 'have'} no result recorded and will stay open. Complete the other ${ids.length - untested}?`)) return
+
+    setBulkBusy(true)
+    const { data, error } = await supabase.rpc('bulk_set_task_status', { p_row_ids: ids, p_status: status })
+    setBulkBusy(false)
+    if (error) { toast.error(error.message); return }
+
+    const done = data?.updated || 0
+    const notes = []
+    if (data?.skippedNoResult) notes.push(`${data.skippedNoResult} left open — no result recorded`)
+    if (data?.skippedNotYours) notes.push(`${data.skippedNotYours} belong to someone else`)
+    if (data?.unchanged) notes.push(`${data.unchanged} already ${BULK_DONE_WORD[status]}`)
+    const summary = `${done} task${done === 1 ? '' : 's'} ${BULK_DONE_WORD[status]}${notes.length ? ` · ${notes.join(' · ')}` : ''}`
+    if (done > 0) toast.success(summary)
+    else toast.error(`Nothing changed — ${notes.join(' · ') || 'these tasks are already up to date'}`)
+    clearSelection()
+    fetchTasks()
+  }
 
   // Every change goes to the test case row; the database applies the same
   // rules as the Test Plan grid and writes the activity log.
@@ -199,6 +259,44 @@ export default function TodoPage() {
             </div>
           </div>
 
+          {selectedVisible.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-blue-500/40 bg-blue-500/10 px-3 py-2">
+              <span className="text-[12px] font-semibold text-white">
+                {selectedVisible.length} task{selectedVisible.length === 1 ? '' : 's'} selected
+              </span>
+              {tab === 'open' ? (
+                <>
+                  <button
+                    onClick={() => bulkSetStatus('completed')}
+                    disabled={bulkBusy || !canExecute}
+                    title={!canExecute ? "Your role can't execute test cases" : undefined}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-semibold text-white bg-green-600 hover:bg-green-500 disabled:opacity-40"
+                  >
+                    <CheckCircle2 size={13} /> {bulkBusy ? 'Working…' : 'Complete Selected'}
+                  </button>
+                  <button
+                    onClick={() => bulkSetStatus('closed')}
+                    disabled={bulkBusy || !canExecute}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-semibold text-gray-300 border border-gray-600 hover:bg-gray-700/50 disabled:opacity-40"
+                  >
+                    <XCircle size={13} /> Close Selected
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => bulkSetStatus('open')}
+                  disabled={bulkBusy || !canExecute}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-semibold text-gray-300 border border-gray-600 hover:bg-gray-700/50 disabled:opacity-40"
+                >
+                  <RotateCcw size={13} /> Reopen Selected
+                </button>
+              )}
+              <button onClick={clearSelection} className="ml-auto text-[12px] text-gray-400 hover:text-white">
+                Clear Selection
+              </button>
+            </div>
+          )}
+
           {visible.length === 0 ? (
             <div className="border border-gray-800 rounded-lg">
               <EmptyState
@@ -211,12 +309,23 @@ export default function TodoPage() {
             </div>
           ) : (
             <div className="border border-gray-800 rounded-lg overflow-x-auto">
-              <table className="w-full border-collapse table-fixed min-w-[1000px]">
+              <table className="w-full border-collapse table-fixed min-w-[1040px]">
                 <thead>
                   <tr className="bg-gray-800/80 text-left">
+                    <th className="w-[36px] px-2.5 py-2 border-b border-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        ref={(el) => { if (el) el.indeterminate = selectedVisible.length > 0 && !allVisibleSelected }}
+                        onChange={toggleAllVisible}
+                        aria-label={allVisibleSelected ? 'Clear selection' : 'Select all tasks'}
+                        title={allVisibleSelected ? 'Clear selection' : 'Select all tasks'}
+                        className="accent-blue-500 cursor-pointer"
+                      />
+                    </th>
                     {[
-                      ['Test Case / Scenario', 'w-[26%]'], ['Assigned By / To', 'w-[13%]'], ['Test Plan', 'w-[13%]'],
-                      ['Result', 'w-[17%]'], ['Assigned On', 'w-[12%]'], ['Task', 'w-[11%]'], ['Action', 'w-[8%]'],
+                      ['Test Case / Scenario', 'w-[24%]'], ['Assigned By / To', 'w-[12%]'], ['Test Plan', 'w-[13%]'],
+                      ['Result', 'w-[16%]'], ['Assigned On', 'w-[12%]'], ['Task', 'w-[11%]'], ['Action', 'w-[8%]'],
                     ].map(([label, w]) => (
                       <th key={label} className={`${w} px-2.5 py-2 text-[11px] font-semibold text-gray-300 uppercase tracking-wide border-b border-gray-700`}>
                         {label}
@@ -226,7 +335,21 @@ export default function TodoPage() {
                 </thead>
                 <tbody>
                   {visible.map((t) => (
-                    <tr key={t.id} className="align-top border-b border-gray-800/70 text-[12px] hover:bg-gray-800/30">
+                    <tr
+                      key={t.id}
+                      className={`align-top border-b border-gray-800/70 text-[12px] ${
+                        selected.has(t.id) ? 'bg-blue-500/10' : 'hover:bg-gray-800/30'
+                      }`}
+                    >
+                      <td className="px-2.5 py-2">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(t.id)}
+                          onChange={() => toggleOne(t.id)}
+                          aria-label={`Select ${formatCaseId(t.case_number)}`}
+                          className="accent-blue-500 cursor-pointer"
+                        />
+                      </td>
                       <td className="px-2.5 py-2">
                         <button onClick={() => setOpenId(t.id)} className="text-left text-white font-medium hover:text-blue-400 line-clamp-2">
                           <span className="mr-1.5 font-mono text-[10px] text-blue-500">{formatCaseId(t.case_number)}</span>
