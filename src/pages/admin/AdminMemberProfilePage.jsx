@@ -7,6 +7,8 @@ import AppHeader from '../../components/AppHeader'
 import PageHeader from '../../components/PageHeader'
 import BentoCard from '../../components/ui/BentoCard'
 import ProgressRing from '../../components/ui/ProgressRing'
+import InfoTip from '../../components/ui/InfoTip'
+import { METRIC_HELP } from '../../lib/metricHelp'
 import StatusBadge from '../../components/ui/StatusBadge'
 import ActivityHeatmap from '../../components/ui/ActivityHeatmap'
 import TrendChart from '../../components/ui/TrendChart'
@@ -154,15 +156,18 @@ export default function AdminMemberProfilePage() {
             <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-3">Assigned Work</p>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
               {[
-                { label: 'Assigned test cases', value: m.total },
-                { label: 'Completed', value: m.completed },
-                { label: 'In progress', value: m.inProgress },
-                { label: 'Not started', value: m.pending },
-                { label: 'Overdue', value: m.overdue },
+                { label: 'Assigned test cases', value: m.total, help: METRIC_HELP.assigned },
+                { label: 'Completed', value: m.completed, help: METRIC_HELP.completed },
+                { label: 'In progress', value: m.inProgress, help: METRIC_HELP.inProgress },
+                { label: 'Not started', value: m.pending, help: METRIC_HELP.notStarted },
+                { label: 'Overdue', value: m.overdue, help: METRIC_HELP.overdue },
               ].map((s) => (
                 <div key={s.label} className="border border-gray-600 rounded-md px-3 py-2">
                   <p className="text-lg font-semibold text-white">{s.value}</p>
-                  <p className="text-[11px] text-gray-500">{s.label}</p>
+                  <p className="text-[11px] text-gray-500 flex items-center gap-1">
+                    {s.label}
+                    <InfoTip label={s.label} text={s.help} />
+                  </p>
                 </div>
               ))}
             </div>
@@ -170,15 +175,18 @@ export default function AdminMemberProfilePage() {
             <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mt-4 mb-3">Today</p>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
               {[
-                { label: 'Tasks completed', value: m.completedToday },
-                { label: 'Tests executed', value: m.testsExecutedToday },
-                { label: 'Passed', value: m.testsPassedToday },
-                { label: 'Failed', value: m.testsFailedToday },
-                { label: 'Blocked', value: m.testsBlockedToday },
+                { label: 'Tasks completed', value: m.completedToday, help: METRIC_HELP.tasksCompletedToday },
+                { label: 'Tests executed', value: m.testsExecutedToday, help: METRIC_HELP.testsExecutedToday },
+                { label: 'Passed', value: m.testsPassedToday, help: METRIC_HELP.passedToday },
+                { label: 'Failed', value: m.testsFailedToday, help: METRIC_HELP.failedToday },
+                { label: 'Blocked', value: m.testsBlockedToday, help: METRIC_HELP.blockedToday },
               ].map((s) => (
                 <div key={s.label} className="border border-gray-600 rounded-md px-3 py-2">
                   <p className="text-lg font-semibold text-white">{s.value}</p>
-                  <p className="text-[11px] text-gray-500">{s.label}</p>
+                  <p className="text-[11px] text-gray-500 flex items-center gap-1">
+                    {s.label}
+                    <InfoTip label={s.label} text={s.help} />
+                  </p>
                 </div>
               ))}
             </div>
@@ -186,15 +194,18 @@ export default function AdminMemberProfilePage() {
             <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mt-4 mb-3">All Time</p>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
               {[
-                { label: 'Tests executed', value: m.testsExecuted },
-                { label: 'Bugs reported', value: m.bugsReported },
-                { label: 'Bugs fixed', value: m.bugsFixed },
-                { label: 'Pass rate', value: m.passRate === null ? '—' : `${m.passRate}%` },
-                { label: 'Actions today', value: m.actionsToday },
+                { label: 'Tests executed', value: m.testsExecuted, help: METRIC_HELP.testsExecuted },
+                { label: 'Bugs reported', value: m.bugsReported, help: METRIC_HELP.bugsReported },
+                { label: 'Bugs fixed', value: m.bugsFixed, help: METRIC_HELP.bugsFixed },
+                { label: 'Pass rate', value: m.passRate === null ? '—' : `${m.passRate}%`, help: METRIC_HELP.passRate },
+                { label: 'Actions today', value: m.actionsToday, help: METRIC_HELP.actionsToday },
               ].map((s) => (
                 <div key={s.label} className="border border-gray-600 rounded-md px-3 py-2">
                   <p className="text-lg font-semibold text-white">{s.value}</p>
-                  <p className="text-[11px] text-gray-500">{s.label}</p>
+                  <p className="text-[11px] text-gray-500 flex items-center gap-1">
+                    {s.label}
+                    <InfoTip label={s.label} text={s.help} />
+                  </p>
                 </div>
               ))}
             </div>

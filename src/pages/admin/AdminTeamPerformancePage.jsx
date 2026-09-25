@@ -10,6 +10,8 @@ import AppHeader from '../../components/AppHeader'
 import PageHeader from '../../components/PageHeader'
 import EnterpriseTable from '../../components/ui/EnterpriseTable'
 import StatusBadge from '../../components/ui/StatusBadge'
+import InfoTip from '../../components/ui/InfoTip'
+import { METRIC_HELP } from '../../lib/metricHelp'
 import StatCard from '../../components/ui/StatCard'
 import ProgressRing from '../../components/ui/ProgressRing'
 import TeamMemberCard from '../../components/TeamMemberCard'
@@ -25,6 +27,16 @@ function MiniBar({ label, pct, color }) {
       </div>
       <span className="text-[9px] text-gray-500 w-7 text-right flex-shrink-0">{pct === null ? '—' : `${pct}%`}</span>
     </div>
+  )
+}
+
+// A column heading with the ⓘ note that explains what the column counts.
+function head(label, help) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      {label}
+      <InfoTip label={label} text={help} />
+    </span>
   )
 }
 
@@ -158,14 +170,14 @@ export default function AdminTeamPerformancePage() {
                   </div>
                 ),
               },
-              { key: 'total', label: 'Assigned' },
-              { key: 'completed', label: 'Completed' },
+              { key: 'total', label: head('Assigned', METRIC_HELP.assigned) },
+              { key: 'completed', label: head('Completed', METRIC_HELP.completed) },
               { key: 'remaining', label: 'Remaining', render: (m) => m.remaining > 0 ? `${m.remaining} (${m.inProgress} in progress)` : '0' },
-              { key: 'testsExecuted', label: 'Tests Executed' },
-              { key: 'bugsReported', label: 'Bugs Reported' },
-              { key: 'bugsFixed', label: 'Bugs Fixed' },
+              { key: 'testsExecuted', label: head('Tests Executed', METRIC_HELP.testsExecuted) },
+              { key: 'bugsReported', label: head('Bugs Reported', METRIC_HELP.bugsReported) },
+              { key: 'bugsFixed', label: head('Bugs Fixed', METRIC_HELP.bugsFixed) },
               { key: 'activeProjects', label: 'Projects' },
-              { key: 'actionsToday', label: 'Actions Today', render: (m) => m.actionsToday > 0 ? m.actionsToday : '—' },
+              { key: 'actionsToday', label: head('Actions Today', METRIC_HELP.actionsToday), render: (m) => m.actionsToday > 0 ? m.actionsToday : '—' },
               {
                 key: 'progress', label: 'Progress', width: '170px',
                 render: (m) => (
@@ -178,7 +190,7 @@ export default function AdminTeamPerformancePage() {
               },
               { key: 'lastActivity', label: 'Last Activity', render: (m) => timeAgo(m.lastActivity) },
               { key: 'status', label: 'Status', render: (m) => <StatusBadge domain={MEMBER_STATUS} value={m.status} dot /> },
-              { key: 'overdue', label: 'Due', render: (m) => m.overdue > 0 ? <span className="text-red-600 font-medium">{m.overdue}</span> : '0' },
+              { key: 'overdue', label: head('Due', METRIC_HELP.overdue), render: (m) => m.overdue > 0 ? <span className="text-red-600 font-medium">{m.overdue}</span> : '0' },
               {
                 key: 'rating', label: 'Score',
                 render: (m) => <ProgressRing percent={m.performanceScore} size={28} strokeColor="stroke-blue-500" label={String(m.performanceScore)} />,
