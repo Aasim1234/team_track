@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Tag, Pencil, Trash2, Check, X, Plus, AlertTriangle } from 'lucide-react'
+import { Tag, Pencil, Trash2, Check, X, Plus, RotateCcw, Archive, Undo2 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import Modal from './ui/Modal'
 import FormField, { inputClass } from './ui/FormField'
@@ -16,6 +16,9 @@ const NEW_RELEASE = '__new'
 // Newest first, comparing numbers as numbers: 12.71 before 12.70, 12.10 after 12.9.
 export const sortReleases = (list) =>
   [...(list || [])].sort((a, b) => b.name.localeCompare(a.name, undefined, { numeric: true, sensitivity: 'base' }))
+
+// "1 result" / "299 results"
+const fmtCount = (n, word) => `${(n ?? 0).toLocaleString()} ${word}${n === 1 ? '' : 's'}`
 
 const friendlyError = (error) =>
   error?.code === '23505' ? 'That release version already exists in this project.' : error?.message
@@ -94,16 +97,35 @@ export function ChangeReleaseModal({ open, onClose, plan, projectId, releases, o
   const [value, setValue] = useState('')
   const [newName, setNewName] = useState('')
   const [saving, setSaving] = useState(false)
+  // What this release has done so far, and what other releases of this plan
+  // still hold — so the dialog can say exactly what is kept and what returns.
+  const [current, setCurrent] = useState(null)
+  const [saved, setSaved] = useState([])
 
   useEffect(() => {
-    if (open) {
-      setValue(plan?.release_version_id || '')
-      setNewName('')
-      setSaving(false)
-    }
+    if (!open || !plan) return
+    setValue(plan.release_version_id || '')
+    setNewName('')
+    setSaving(false)
+    setCurrent(null)
+    setSaved([])
+    let cancelled = false
+    const rows = () => supabase.from('vms_test_plan_rows').select('id', { count: 'exact', head: true }).eq('plan_id', plan.id)
+    Promise.all([
+      rows(),
+      rows().neq('result', 'not_tested'),
+      rows().not('assigned_to', 'is', null),
+      supabase.rpc('plan_release_contexts', { p_plan_id: plan.id }),
+    ]).then(([total, executed, assigned, contexts]) => {
+      if (cancelled) return
+      setCurrent({ cases: total.count || 0, executed: executed.count || 0, assigned: assigned.count || 0 })
+      setSaved(contexts.data || [])
+    })
+    return () => { cancelled = true }
   }, [open, plan])
 
   const finished = ['pass', 'discard'].includes(plan?.status)
+  const target = saved.find((s) => s.releaseId === value)
 
   const submit = async (e) => {
     e.preventDefault()
@@ -112,18 +134,23 @@ export function ChangeReleaseModal({ open, onClose, plan, projectId, releases, o
     setSaving(true)
     const resolved = await resolveReleaseId(projectId, value, newName)
     if (resolved.error) { setSaving(false); toast.error(resolved.error); return }
-    const { data, error } = await supabase
-      .from('test_plans')
-      .update({ release_version_id: resolved.id, ...(finished ? { status: 'active' } : {}) })
-      .eq('id', plan.id)
-      .select('id')
+    // One call does the whole switch: save this release's work, clear every
+    // test case for the new release, and bring back that release's own work.
+    const { data, error } = await supabase.rpc('change_plan_release', {
+      p_plan_id: plan.id,
+      p_release_version_id: resolved.id,
+    })
     setSaving(false)
-    if (error || !data?.length) {
-      toast.error(error?.message || "You don't have permission to change this test plan's release version.")
+    if (error) {
+      toast.error(error.message || "You don't have permission to change this test plan's release version.")
       return
     }
-    const name = resolved.name || releases.find((r) => r.id === resolved.id)?.name
-    toast.success(`Release version changed to ${name}`)
+    const name = data?.release || resolved.name || releases.find((r) => r.id === resolved.id)?.name
+    if (data?.restored) {
+      toast.success(`Now testing release ${name} — its ${fmtCount(data.restoredResults, 'result')} and ${fmtCount(data.restoredAssignments, 'assignment')} are back`)
+    } else {
+      toast.success(`Now testing release ${name} — ${fmtCount(data?.cases ?? 0, 'test case')} start as Not Tested`)
+    }
     onSaved()
   }
 
@@ -144,24 +171,47 @@ export function ChangeReleaseModal({ open, onClose, plan, projectId, releases, o
             newName={newName}
             onNewName={setNewName}
           />
-          {finished ? (
-            <p className="text-[11px] text-gray-500">
-              This plan is marked {plan.status === 'pass' ? 'Pass' : 'Discard'} for release {plan.release?.name}. That release report stays in Reports,
-              and the plan starts as Active in the new release version.
-            </p>
-          ) : plan.release?.name ? (
-            // A report is only saved when a plan is marked Pass or Discard, so
-            // moving on without doing that leaves the old release with none.
-            <p className="flex items-start gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-[11px] text-gray-300">
-              <AlertTriangle size={12} className="text-amber-500 mt-0.5 flex-shrink-0" />
-              <span>
-                No release report will be kept for <span className="text-white font-medium">{plan.release.name}</span>: one is saved only when a test plan is
-                marked Pass or Discard. Set this plan's status first if you need a {plan.release.name} report — its results move on with the plan.
-              </span>
-            </p>
-          ) : (
-            <p className="text-[11px] text-gray-500">The test plan list, To-Do and exports all show the release version saved here.</p>
+
+          {/* A release version is a fresh round of testing, so the new release
+              starts from nothing while the old one keeps what it earned. */}
+          {value && value !== plan.release_version_id && (
+            <div className="space-y-2">
+              <p className="flex items-start gap-1.5 rounded-md border border-blue-500/30 bg-blue-500/10 px-2.5 py-2 text-[11px] text-gray-300">
+                <RotateCcw size={12} className="text-blue-400 mt-0.5 flex-shrink-0" />
+                <span>
+                  {current
+                    ? `All ${fmtCount(current.cases, 'test case')} stay in this plan and start as Not Tested, with nobody assigned and no To-Do tasks.`
+                    : 'Every test case stays in this plan and starts as Not Tested, with nobody assigned and no To-Do tasks.'}
+                </span>
+              </p>
+              {current && (current.executed > 0 || current.assigned > 0) && plan.release?.name && (
+                <p className="flex items-start gap-1.5 rounded-md border border-gray-600 bg-gray-700 px-2.5 py-2 text-[11px] text-gray-300">
+                  <Archive size={12} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                  <span>
+                    Release <span className="text-white font-medium">{plan.release.name}</span> keeps its {fmtCount(current.executed, 'result')} and{' '}
+                    {fmtCount(current.assigned, 'assignment')} — they come back if you move this plan to {plan.release.name} again.
+                    {!finished && ' Its release report is only written when the plan is marked Pass or Discard.'}
+                  </span>
+                </p>
+              )}
+              {target && (
+                <p className="flex items-start gap-1.5 rounded-md border border-green-500/30 bg-green-500/10 px-2.5 py-2 text-[11px] text-gray-300">
+                  <Undo2 size={12} className="text-green-500 mt-0.5 flex-shrink-0" />
+                  <span>
+                    This plan was on <span className="text-white font-medium">{target.release}</span> before, so its {fmtCount(target.executed, 'result')} and{' '}
+                    {fmtCount(target.assigned, 'assignment')} come back instead of a clean start.
+                  </span>
+                </p>
+              )}
+              {finished && (
+                <p className="text-[11px] text-gray-500">
+                  This plan is marked {plan.status === 'pass' ? 'Pass' : 'Discard'} for release {plan.release?.name}. That release report stays in Reports,
+                  and the plan starts as Active in the new release version.
+                </p>
+              )}
+            </div>
           )}
+
           <PrimaryButton type="submit" disabled={saving || !value}>
             {saving ? 'Saving…' : 'Save Release Version'}
           </PrimaryButton>

@@ -64,7 +64,7 @@ function AutoTextarea({ value, onChange, onKeyDown, autoFocus, className }) {
   )
 }
 
-export default function VmsPlanGrid({ planId, planName = 'this test plan', projectId, userId, members = [], focusRowId }) {
+export default function VmsPlanGrid({ planId, planName = 'this test plan', projectId, userId, members = [], focusRowId, reloadKey }) {
   const toast = useToast()
   // What this user may do comes from their role; the database enforces the same rules.
   const { can } = usePermissions()
@@ -122,7 +122,7 @@ export default function VmsPlanGrid({ planId, planName = 'this test plan', proje
     setLoading(false)
   }
 
-  useEffect(() => { fetchRows() }, [planId])
+  useEffect(() => { fetchRows() }, [planId, reloadKey])
 
   // Opened from a link to one test case (e.g. Recently added test cases):
   // bring that row into view and highlight it briefly.

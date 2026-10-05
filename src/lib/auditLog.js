@@ -26,6 +26,7 @@ export const AUDIT_ACTIONS = {
   plan_edited: { label: 'Edited test plan' },
   plan_deleted: { label: 'Deleted test plan' },
   release_version_changed: { label: 'Changed release version' },
+  release_context_reset: { label: 'Started a release with a clean execution' },
   release_created: { label: 'Created release version' },
   release_renamed: { label: 'Renamed release version' },
   release_deleted: { label: 'Deleted release version' },

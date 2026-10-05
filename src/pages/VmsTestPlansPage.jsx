@@ -371,6 +371,10 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
   const [showRelease, setShowRelease] = useState(false)
   const [statusChange, setStatusChange] = useState(null)   // status awaiting confirmation (Pass / Discard / reopen)
 
+  // Bumped when something outside the grid rewrote its test cases — changing
+  // the release version clears every result and assignment.
+  const [rowsKey, setRowsKey] = useState(0)
+
   const fetchPlan = async () => {
     const [{ data: planRow }, { data: itemRows }] = await Promise.all([
       supabase.from('test_plans').select('*, owner:profiles!owner_id(id, name), creator:profiles!created_by(name), release:release_versions(id, name)').eq('id', planId).single(),
@@ -598,6 +602,7 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
               userId={userId}
               members={members}
               focusRowId={searchParams.get('case')}
+              reloadKey={rowsKey}
             />
           </BentoCard>
         </div>
@@ -626,7 +631,7 @@ function TestPlanDetail({ projectId, planId, project, runs, statusRows, members,
         plan={plan}
         projectId={projectId}
         releases={releases}
-        onSaved={() => { setShowRelease(false); fetchPlan(); onRefreshList() }}
+        onSaved={() => { setShowRelease(false); setRowsKey((k) => k + 1); fetchPlan(); onRefreshList() }}
       />
 
       <ExportTestPlanModal
